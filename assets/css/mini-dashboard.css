@@ -179,6 +179,8 @@
   overflow: hidden;
   z-index: 1000;
   animation: slideDown 0.3s ease;
+  display: flex;
+  flex-direction: column;
 }
 
 @keyframes slideDown {
@@ -193,6 +195,7 @@
   padding: 15px 20px;
   border-bottom: 2px solid #e9ecef;
   background: #f8f9fa;
+  flex-shrink: 0;
 }
 
 .cig-mini-dropdown-header h3 {
@@ -233,6 +236,7 @@
   justify-content: space-between;
   gap: 15px;
   flex-wrap: nowrap; /* Force single line if space permits */
+  flex-shrink: 0;
 }
 
 .cig-mini-quick-filters {
@@ -293,7 +297,8 @@
 
 .cig-mini-dropdown-content {
   overflow-y: auto;
-  max-height: 400px;
+  flex: 1;
+  min-height: 0;
 }
 
 .cig-mini-invoices-table {
@@ -479,6 +484,7 @@
   padding: 10px 20px;
   border-top: 1px solid #e9ecef;
   background: #f8f9fa;
+  flex-shrink: 0;
 }
 
 .cig-mini-page-btn {
@@ -527,6 +533,7 @@
   background: #f8f9fa;
   border-top: 1px solid #dee2e6;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .cig-mini-link-full {
