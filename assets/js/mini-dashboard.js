@@ -6,6 +6,8 @@ jQuery(function ($) {
   var searchTerm = '';
   var searchTimeout = null;
   var expiringData = [];
+  var currentPage = 1;
+  var totalPages = 1;
 
   // Initialize
   $(document).ready(function() {
@@ -39,12 +41,14 @@ jQuery(function ($) {
       $('.cig-mini-filter-btn').removeClass('active');
       $(this).addClass('active');
       currentFilter = $(this).data('filter');
+      currentPage = 1;
       loadMyInvoices();
     });
 
     // Status Filter
     $(document).on('change', '#cig-mini-status-filter', function() {
         currentStatus = $(this).val();
+        currentPage = 1;
         loadMyInvoices();
     });
 
@@ -54,8 +58,18 @@ jQuery(function ($) {
       var term = $(this).val().trim();
       searchTimeout = setTimeout(function() {
         searchTerm = term;
+        currentPage = 1;
         loadMyInvoices();
       }, 300);
+    });
+
+    // Pagination clicks
+    $(document).on('click', '.cig-mini-page-btn', function() {
+      var page = $(this).data('page');
+      if (page && page !== currentPage) {
+        currentPage = page;
+        loadMyInvoices();
+      }
     });
 
     // Expiring reservations click
@@ -175,17 +189,23 @@ jQuery(function ($) {
         nonce: cigAjax.nonce,
         filter: currentFilter,
         search: searchTerm,
-        status: currentStatus
+        status: currentStatus,
+        paged: currentPage
       },
       success: function(res) {
         if (res && res.success && res.data) {
+          totalPages = res.data.total_pages || 1;
+          currentPage = res.data.current_page || 1;
           renderInvoices(res.data.invoices);
+          renderPagination();
         } else {
           $('#cig-mini-invoices-tbody').html('<tr><td colspan="7" class="cig-mini-no-results">' + (cigAjax.i18n?.no_invoices_found || 'No invoices found') + '</td></tr>');
+          $('#cig-mini-pagination').remove();
         }
       },
       error: function() {
         $('#cig-mini-invoices-tbody').html('<tr><td colspan="7" class="cig-mini-no-results" style="color:#dc3545;">' + (cigAjax.i18n?.error_loading_invoices || 'Error loading invoices') + '</td></tr>');
+        $('#cig-mini-pagination').remove();
       }
     });
   }
@@ -269,6 +289,60 @@ jQuery(function ($) {
     });
 
     $('#cig-expiring-list').html(html);
+  }
+
+  // Render pagination
+  function renderPagination() {
+    $('#cig-mini-pagination').remove();
+    if (totalPages <= 1) return;
+
+    var html = '<div id="cig-mini-pagination" class="cig-mini-pagination">';
+
+    // Previous button
+    if (currentPage > 1) {
+      html += '<button type="button" class="cig-mini-page-btn cig-mini-page-arrow" data-page="' + (currentPage - 1) + '">&laquo;</button>';
+    }
+
+    // Page numbers with ellipsis
+    var pages = [];
+    var maxVisible = 5;
+    var startPage, endPage;
+
+    if (totalPages <= maxVisible) {
+      startPage = 1;
+      endPage = totalPages;
+    } else {
+      startPage = Math.max(1, currentPage - 2);
+      endPage = Math.min(totalPages, startPage + maxVisible - 1);
+      if (endPage - startPage < maxVisible - 1) {
+        startPage = Math.max(1, endPage - maxVisible + 1);
+      }
+    }
+
+    if (startPage > 1) {
+      html += '<button type="button" class="cig-mini-page-btn" data-page="1">1</button>';
+      if (startPage > 2) html += '<span class="cig-mini-page-dots">...</span>';
+    }
+
+    for (var i = startPage; i <= endPage; i++) {
+      var activeClass = i === currentPage ? ' active' : '';
+      html += '<button type="button" class="cig-mini-page-btn' + activeClass + '" data-page="' + i + '">' + i + '</button>';
+    }
+
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) html += '<span class="cig-mini-page-dots">...</span>';
+      html += '<button type="button" class="cig-mini-page-btn" data-page="' + totalPages + '">' + totalPages + '</button>';
+    }
+
+    // Next button
+    if (currentPage < totalPages) {
+      html += '<button type="button" class="cig-mini-page-btn cig-mini-page-arrow" data-page="' + (currentPage + 1) + '">&raquo;</button>';
+    }
+
+    html += '</div>';
+
+    // Insert after the table, inside the dropdown content
+    $('.cig-mini-dropdown-content').after(html);
   }
 
   // Utility functions

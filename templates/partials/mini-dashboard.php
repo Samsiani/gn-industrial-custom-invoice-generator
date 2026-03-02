@@ -114,11 +114,12 @@ if (is_singular('invoice')) {
             <div class="cig-mini-inputs-group">
                 <select id="cig-mini-status-filter" class="cig-mini-select-filter">
                     <option value="standard" selected="selected"><?php esc_html_e('Active', 'cig'); ?></option>
+                    <option value="reserved"><?php esc_html_e('Reserved', 'cig'); ?></option>
                     <option value="fictive"><?php esc_html_e('Fictive', 'cig'); ?></option>
                     <option value="all"><?php esc_html_e('All Status', 'cig'); ?></option>
                 </select>
 
-                <input type="text" id="cig-mini-invoice-search" class="cig-mini-search-input" placeholder="<?php esc_attr_e('Search #...', 'cig'); ?>">
+                <input type="text" id="cig-mini-invoice-search" class="cig-mini-search-input" placeholder="<?php esc_attr_e('Search...', 'cig'); ?>">
             </div>
         </div>
 

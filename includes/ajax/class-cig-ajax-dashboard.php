@@ -24,6 +24,10 @@ class CIG_Ajax_Dashboard {
     private function get_status_meta_query($status) {
         if ($status === 'all') return [];
         if ($status === 'fictive') return [['key' => '_cig_invoice_status', 'value' => 'fictive', 'compare' => '=']];
+        if ($status === 'reserved') return [
+            ['key' => '_cig_lifecycle_status', 'value' => 'reserved', 'compare' => '='],
+            ['relation' => 'OR', ['key' => '_cig_invoice_status', 'value' => 'standard', 'compare' => '='], ['key' => '_cig_invoice_status', 'compare' => 'NOT EXISTS']]
+        ];
         return [['relation' => 'OR', ['key' => '_cig_invoice_status', 'value' => 'standard', 'compare' => '='], ['key' => '_cig_invoice_status', 'compare' => 'NOT EXISTS']]];
     }
 
@@ -38,19 +42,28 @@ class CIG_Ajax_Dashboard {
         $filter = sanitize_text_field($_POST['filter'] ?? 'all');
         $search = sanitize_text_field($_POST['search'] ?? '');
         $status = sanitize_text_field($_POST['status'] ?? 'standard');
+        $paged  = isset($_POST['paged']) ? max(1, intval($_POST['paged'])) : 1;
 
         $args = [
             'post_type' => 'invoice',
             'post_status' => 'publish',
             'author' => $uid,
             'posts_per_page' => 20,
+            'paged' => $paged,
             'orderby' => 'date',
             'order' => 'DESC'
         ];
 
         $meta = $this->get_status_meta_query($status);
         if ($search) {
-            $meta[] = ['key' => '_cig_invoice_number', 'value' => $search, 'compare' => 'LIKE'];
+            $meta[] = [
+                'relation' => 'OR',
+                ['key' => '_cig_invoice_number', 'value' => $search, 'compare' => 'LIKE'],
+                ['key' => '_cig_buyer_name',     'value' => $search, 'compare' => 'LIKE'],
+                ['key' => '_cig_buyer_tax_id',   'value' => $search, 'compare' => 'LIKE'],
+                ['key' => '_cig_buyer_phone',    'value' => $search, 'compare' => 'LIKE'],
+                ['key' => '_cig_buyer_email',    'value' => $search, 'compare' => 'LIKE'],
+            ];
         }
         if ($meta) {
             $args['meta_query'] = $meta;
@@ -120,6 +133,9 @@ class CIG_Ajax_Dashboard {
         
         wp_send_json_success([
             'invoices' => $invoices,
+            'total_pages'  => $query->max_num_pages,
+            'current_page' => $paged,
+            'total_items'  => $query->found_posts,
             'stats' => [
                 'total_invoices' => $tq->found_posts,
                 'last_invoice_date' => !empty($invoices) ? $invoices[0]['date'] : '',
