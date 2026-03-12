@@ -110,6 +110,32 @@ class CIG_Stock_Requests {
      */
     public function handle_actions() {
         if (!isset($_GET['page']) || $_GET['page'] !== 'cig-stock-requests') return;
+
+        // Bulk approve all pending requests
+        if (isset($_GET['action']) && $_GET['action'] === 'approve_all') {
+            $nonce = isset($_GET['_wpnonce']) ? $_GET['_wpnonce'] : '';
+            if (!wp_verify_nonce($nonce, 'cig_req_approve_all')) {
+                wp_die('Security check failed');
+            }
+            if (!current_user_can('manage_woocommerce')) {
+                wp_die('Permission denied');
+            }
+
+            $pending = get_posts([
+                'post_type'      => $this->post_type,
+                'posts_per_page' => -1,
+                'meta_query'     => [['key' => '_cig_req_status', 'value' => 'pending']],
+                'fields'         => 'ids',
+            ]);
+
+            foreach ($pending as $req_id) {
+                $this->approve_request($req_id);
+            }
+
+            wp_redirect(remove_query_arg(['action', '_wpnonce']));
+            exit;
+        }
+
         if (!isset($_GET['action']) || !isset($_GET['req_id'])) return;
 
         $action = sanitize_text_field($_GET['action']);
@@ -163,6 +189,13 @@ class CIG_Stock_Requests {
     }
 
     /**
+     * Get the base URL for this admin page
+     */
+    private function get_page_url() {
+        return admin_url('edit.php?post_type=invoice&page=cig-stock-requests&tab=pending');
+    }
+
+    /**
      * Reject Logic
      */
     private function reject_request($req_id) {
@@ -192,6 +225,14 @@ class CIG_Stock_Requests {
             <br>
             <?php
             if ($tab === 'pending') {
+                $approve_all_url = wp_nonce_url(
+                    add_query_arg(['action' => 'approve_all'], $this->get_page_url()),
+                    'cig_req_approve_all'
+                );
+                echo '<div class="tablenav top" style="margin-bottom:10px;">';
+                echo '<a href="' . esc_url($approve_all_url) . '" class="button button-primary" onclick="return confirm(\'Approve all pending requests?\');">';
+                echo '✓ ' . esc_html__('Approve All', 'cig') . '</a>';
+                echo '</div>';
                 $this->render_table('pending');
             } else {
                 $this->render_table(['approved', 'rejected']);
