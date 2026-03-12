@@ -181,6 +181,9 @@ final class CIG_Invoice_Generator {
         
         // Load Admin Portal
         require_once CIG_INCLUDES_DIR . 'class-cig-admin-portal.php';
+
+        // GitHub Auto-Updater
+        require_once CIG_INCLUDES_DIR . 'class-cig-updater.php';
     }
 
     /**
@@ -249,6 +252,9 @@ final class CIG_Invoice_Generator {
         
         // Init Migrator (4.0.0) - handles admin notices for migration
         $this->migrator = new CIG_Migrator();
+
+        // GitHub auto-updater
+        new CIG_Updater( CIG_PLUGIN_FILE, 'Samsiani', 'gn-industrial-custom-invoice-generator', CIG_VERSION );
     }
 
     /**
