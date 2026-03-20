@@ -80,7 +80,7 @@ class CIG_Settings {
         add_settings_section(
             'cig_bank_section',
             __('Bank Details', 'cig'),
-            function () { echo '<p>' . esc_html__('Configure up to two banks.', 'cig') . '</p>'; },
+            function () { echo '<p>' . esc_html__('Configure up to three banks.', 'cig') . '</p>'; },
             'cig-invoice-settings'
         );
 
@@ -91,6 +91,9 @@ class CIG_Settings {
             'bank2_logo'   => ['label' => __('Bank 2 Logo', 'cig'), 'type' => 'image'],
             'bank2_name'   => ['label' => __('Bank 2 Name', 'cig'), 'type' => 'text'],
             'bank2_account'=> ['label' => __('Bank 2 IBAN / Account #', 'cig'), 'type' => 'text'],
+            'bank3_logo'   => ['label' => __('Bank 3 Logo', 'cig'), 'type' => 'image'],
+            'bank3_name'   => ['label' => __('Bank 3 Name', 'cig'), 'type' => 'text'],
+            'bank3_account'=> ['label' => __('Bank 3 IBAN / Account #', 'cig'), 'type' => 'text'],
         ];
 
         foreach ($bank_fields as $key => $meta) {
@@ -214,6 +217,7 @@ class CIG_Settings {
             'company_logo', 'company_name', 'company_tax_id', 'address', 'phone', 'email', 'website',
             'bank1_logo', 'bank1_name', 'bank1_account',
             'bank2_logo', 'bank2_name', 'bank2_account',
+            'bank3_logo', 'bank3_name', 'bank3_account',
             'director_name', 'director_signature',
             'brand_attribute'
         ];
@@ -223,7 +227,7 @@ class CIG_Settings {
                 continue;
             }
 
-            if (in_array($k, ['company_logo', 'bank1_logo', 'bank2_logo', 'director_signature'], true)) {
+            if (in_array($k, ['company_logo', 'bank1_logo', 'bank2_logo', 'bank3_logo', 'director_signature'], true)) {
                 $output[$k] = esc_url_raw($input[$k]);
             } else {
                 $output[$k] = sanitize_text_field($input[$k]);

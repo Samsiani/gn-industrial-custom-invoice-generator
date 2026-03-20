@@ -24,6 +24,9 @@ $bank1_account= $settings['bank1_account'] ?? '';
 $bank2_logo   = $settings['bank2_logo'] ?? '';
 $bank2_name   = $settings['bank2_name'] ?? '';
 $bank2_account= $settings['bank2_account'] ?? '';
+$bank3_logo   = $settings['bank3_logo'] ?? '';
+$bank3_name   = $settings['bank3_name'] ?? '';
+$bank3_account= $settings['bank3_account'] ?? '';
 $director_name= $settings['director_name'] ?? '';
 $signature_img= $settings['director_signature'] ?? '';
 
@@ -366,6 +369,7 @@ $payment_methods_map = [
   <footer class="invoice-footer-bank">
     <div class="bank-details">
       <strong><?php esc_html_e('Bank Details:','cig'); ?></strong>
+      <div class="bank-cards-row">
       <?php if ($bank1_name || $bank1_account || $bank1_logo): ?>
         <div class="bank-card">
           <div class="bank-card-header">
@@ -384,6 +388,16 @@ $payment_methods_map = [
           <?php if ($bank2_account): ?><div class="bank-iban"><?php echo esc_html($bank2_account); ?></div><?php endif; ?>
         </div>
       <?php endif; ?>
+      <?php if ($bank3_name || $bank3_account || $bank3_logo): ?>
+        <div class="bank-card">
+          <div class="bank-card-header">
+            <?php if ($bank3_logo): ?><img class="bank-logo" src="<?php echo esc_url($bank3_logo); ?>" alt="<?php echo esc_attr($bank3_name); ?>"><?php endif; ?>
+            <?php if ($bank3_name): ?><span class="bank-name"><?php echo esc_html($bank3_name); ?></span><?php endif; ?>
+          </div>
+          <?php if ($bank3_account): ?><div class="bank-iban"><?php echo esc_html($bank3_account); ?></div><?php endif; ?>
+        </div>
+      <?php endif; ?>
+      </div>
     </div>
     <div class="director-signature">
       <?php if ($director_name): ?><strong><?php echo esc_html(sprintf(__('Director: %s','cig'),$director_name)); ?></strong><?php endif; ?>
