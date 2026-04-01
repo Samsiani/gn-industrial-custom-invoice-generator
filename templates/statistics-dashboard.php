@@ -544,6 +544,28 @@ if (!defined('ABSPATH')) {
             </div>
         </div>
 
+        <!-- Product Sold Summary -->
+        <div class="cig-stats-summary" id="cig-product-sold-summary" style="grid-template-columns: repeat(2, 1fr); display:none;">
+            <div class="cig-stat-card">
+                <div class="cig-stat-icon" style="background:#28a745;">
+                    <span class="dashicons dashicons-chart-bar"></span>
+                </div>
+                <div class="cig-stat-content">
+                    <div class="cig-stat-label"><?php esc_html_e('Total Units Sold', 'cig'); ?></div>
+                    <div class="cig-stat-value" id="cig-pp-total-units">0</div>
+                </div>
+            </div>
+            <div class="cig-stat-card">
+                <div class="cig-stat-icon" style="background:#50529d;">
+                    <span class="dashicons dashicons-products"></span>
+                </div>
+                <div class="cig-stat-content">
+                    <div class="cig-stat-label"><?php esc_html_e('Unique Products', 'cig'); ?></div>
+                    <div class="cig-stat-value" id="cig-pp-unique-products">0</div>
+                </div>
+            </div>
+        </div>
+
         <!-- Product Performance Table -->
         <div class="cig-table-card" id="cig-product-perf-panel">
             <div class="cig-section-header cig-users-header-inline">

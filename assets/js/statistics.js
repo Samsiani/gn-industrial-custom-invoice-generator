@@ -793,14 +793,22 @@ jQuery(function ($) {
                   renderProductTable(productPerfData);
                   renderProductPagination();
                   updateProductSortArrows();
+                  // Update sold summary cards
+                  if (res.data.totals) {
+                      $('#cig-pp-total-units').text(formatNumber(res.data.totals.total_units_sold));
+                      $('#cig-pp-unique-products').text(formatNumber(res.data.totals.unique_products));
+                      $('#cig-product-sold-summary').show();
+                  }
               } else {
                   $('#cig-product-perf-tbody').html('<tr><td colspan="8" style="text-align:center; padding:20px; color:#999;">' + (cigStats.i18n?.no_products_found || 'No products found') + '</td></tr>');
                   $('#cig-product-pagination').html('');
+                  $('#cig-product-sold-summary').hide();
               }
           },
           error: function() {
               $('#cig-product-perf-tbody').html('<tr><td colspan="8" style="text-align:center; padding:20px; color:#dc3545;">' + (cigStats.i18n?.error_loading_products || 'Error loading products') + '</td></tr>');
               $('#cig-product-pagination').html('');
+              $('#cig-product-sold-summary').hide();
           }
       });
   }

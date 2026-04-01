@@ -1354,6 +1354,34 @@ class CIG_Ajax_Statistics {
         );
         $total_pages = max(1, ceil(intval($total_count) / $per_page));
 
+        // Get totals across all pages (total units sold + unique products)
+        $totals_sql = "SELECT
+            COUNT(DISTINCT it.product_id) as unique_products,
+            COALESCE(SUM(CASE
+                WHEN inv.status = 'standard' AND it.item_status = 'sold'";
+        if ($date_from) $totals_sql .= " AND inv.sale_date >= %s";
+        if ($date_to) $totals_sql .= " AND inv.sale_date <= %s";
+        $totals_sql .= " THEN it.quantity ELSE 0 END), 0) as total_units_sold
+            FROM {$this->table_items} it
+            INNER JOIN {$this->table_invoices} inv ON it.invoice_id = inv.id
+            WHERE " . ($search ? "(it.product_name LIKE %s OR it.sku LIKE %s)" : "1=1");
+
+        $totals_params = [];
+        if ($date_from) $totals_params[] = $date_from_full;
+        if ($date_to) $totals_params[] = $date_to_full;
+        if ($search) {
+            $totals_params[] = $search_like;
+            $totals_params[] = $search_like;
+        }
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
+        $totals_row = $wpdb->get_row(
+            !empty($totals_params) ? $wpdb->prepare($totals_sql, $totals_params) : $totals_sql,
+            ARRAY_A
+        );
+        $total_units_sold = (int)($totals_row['total_units_sold'] ?? 0);
+        $unique_products  = (int)($totals_row['unique_products'] ?? 0);
+
         // Process results and get current stock info
         $products = [];
         foreach ($results as $row) {
@@ -1394,6 +1422,10 @@ class CIG_Ajax_Statistics {
             'pagination' => [
                 'current_page' => $page,
                 'total_pages' => (int)$total_pages
+            ],
+            'totals' => [
+                'total_units_sold' => $total_units_sold,
+                'unique_products'  => $unique_products,
             ]
         ]);
     }
