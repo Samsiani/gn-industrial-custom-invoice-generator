@@ -95,7 +95,7 @@ jQuery(function ($) {
                   '</div>' +
               '</td>' +
               '<td class="col-price"><input type="number" class="price" step="0.01" value="' + price + '"><span class="cig-original-price" style="display:none;"></span></td>' +
-              '<td class="col-total"><input type="text" class="row-total" readonly value="' + total + '"></td>' +
+              '<td class="col-total"><input type="number" class="row-total" step="0.01" value="' + total + '"></td>' +
               '<td class="col-status no-print">' +
                   '<select class="product-status">' +
                       '<option value="none">---</option>' +
@@ -400,6 +400,26 @@ jQuery(function ($) {
   }
   $(document).on('input', '.quantity', function () { var $row = $(this).closest('tr'); updateRowTotal($row); checkStock($row); });
   $(document).on('input', '.price', function () { updateRowTotal($(this).closest('tr')); });
+  $(document).on('input', '.row-total', function () {
+    var $row = $(this).closest('tr');
+    var qty = parseFloat($row.find('.quantity').val()) || 0;
+    var newTotal = parseFloat($(this).val()) || 0;
+    if (qty > 0) {
+      var newPrice = (newTotal / qty);
+      $row.find('.price').val(newPrice.toFixed(2));
+    }
+    // Update discount display
+    var origPrice = parseFloat($row.attr('data-original-price')) || 0;
+    var price = parseFloat($row.find('.price').val()) || 0;
+    var $discEl = $row.find('.cig-original-price');
+    if (origPrice > 0 && price < origPrice) {
+      var pct = Math.round((1 - price / origPrice) * 100);
+      if ($discEl.length) $discEl.text(origPrice.toFixed(2) + ' (-' + pct + '%)').show();
+    } else {
+      if ($discEl.length) $discEl.hide();
+    }
+    updateGrandTotal();
+  });
 
   /* Prefill Logic */
   function prefillEditData() {
@@ -432,7 +452,7 @@ jQuery(function ($) {
           '<td class="col-desc"><textarea class="product-desc">'+(it.desc||'')+'</textarea></td>' +
           '<td class="col-qty"><div class="quantity-wrapper"><input type="number" class="quantity" min="1" value="'+(it.qty||1)+'"><div class="qty-btn-group"><button type="button" class="qty-btn qty-increase">▲</button><button type="button" class="qty-btn qty-decrease">▼</button></div></div></td>' +
           '<td class="col-price"><input type="number" class="price" step="0.01" value="'+parseFloat(it.price||0).toFixed(2)+'"><span class="cig-original-price" style="display:none;"></span></td>' +
-          '<td class="col-total"><input type="text" class="row-total" readonly value="'+parseFloat(it.total||0).toFixed(2)+'"></td>' +
+          '<td class="col-total"><input type="number" class="row-total" step="0.01" value="'+parseFloat(it.total||0).toFixed(2)+'"></td>' +
           '<td class="col-status no-print">' +
             '<select class="product-status">' +
                 '<option value="none">---</option>' +

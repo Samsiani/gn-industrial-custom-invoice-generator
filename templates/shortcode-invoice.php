@@ -125,7 +125,7 @@ $current_user = wp_get_current_user();
             </div>
           </td>
           <td class="col-price"><input type="number" class="price" value="0.00" step="0.01"><span class="cig-original-price" style="display:none;"></span></td>
-          <td class="col-total"><input type="text" class="row-total" value="0.00" readonly></td>
+          <td class="col-total"><input type="number" class="row-total" value="0.00" step="0.01"></td>
           <td class="col-status no-print">
             <select class="product-status">
               <option value="none">---</option> <option value="sold"><?php esc_html_e('Sold', 'cig'); ?></option>
