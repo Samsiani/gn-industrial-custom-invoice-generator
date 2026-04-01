@@ -1354,11 +1354,15 @@ class CIG_Ajax_Statistics {
         );
         $total_pages = max(1, ceil(intval($total_count) / $per_page));
 
-        // Get totals across all pages (total units sold + unique products)
+        // Get totals across all pages (total units sold/reserved + unique products)
         $totals_sql = "SELECT
-            COUNT(DISTINCT it.product_id) as unique_products,
+            COUNT(DISTINCT CASE
+                WHEN inv.status = 'standard' AND it.item_status IN ('sold','reserved')";
+        if ($date_from) $totals_sql .= " AND inv.sale_date >= %s";
+        if ($date_to) $totals_sql .= " AND inv.sale_date <= %s";
+        $totals_sql .= " THEN it.product_id ELSE NULL END) as unique_products,
             COALESCE(SUM(CASE
-                WHEN inv.status = 'standard' AND it.item_status = 'sold'";
+                WHEN inv.status = 'standard' AND it.item_status IN ('sold','reserved')";
         if ($date_from) $totals_sql .= " AND inv.sale_date >= %s";
         if ($date_to) $totals_sql .= " AND inv.sale_date <= %s";
         $totals_sql .= " THEN it.quantity ELSE 0 END), 0) as total_units_sold
@@ -1367,6 +1371,10 @@ class CIG_Ajax_Statistics {
             WHERE " . ($search ? "(it.product_name LIKE %s OR it.sku LIKE %s)" : "1=1");
 
         $totals_params = [];
+        // unique_products date params
+        if ($date_from) $totals_params[] = $date_from_full;
+        if ($date_to) $totals_params[] = $date_to_full;
+        // total_units_sold date params
         if ($date_from) $totals_params[] = $date_from_full;
         if ($date_to) $totals_params[] = $date_to_full;
         if ($search) {

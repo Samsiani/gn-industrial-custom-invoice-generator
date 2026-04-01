@@ -551,7 +551,7 @@ if (!defined('ABSPATH')) {
                     <span class="dashicons dashicons-chart-bar"></span>
                 </div>
                 <div class="cig-stat-content">
-                    <div class="cig-stat-label"><?php esc_html_e('Total Units Sold', 'cig'); ?></div>
+                    <div class="cig-stat-label"><?php esc_html_e('Total Units Sold / Reserved', 'cig'); ?></div>
                     <div class="cig-stat-value" id="cig-pp-total-units">0</div>
                 </div>
             </div>
