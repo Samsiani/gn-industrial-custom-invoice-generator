@@ -74,8 +74,9 @@ jQuery(function ($) {
           var qty = parseFloat(item.qty || 1);
           var total = (price * qty).toFixed(2);
           var img = item.image || cigAjax.placeholder_img;
-          
-          var html = '<tr class="cig-item-row">' +
+          var origPrice = parseFloat(item.original_price || item.price || 0);
+
+          var html = '<tr class="cig-item-row" data-original-price="' + origPrice + '">' +
               '<td class="col-n">' + rowNum + '</td>' +
               '<td class="col-name">' +
                   '<input type="text" class="product-search" data-product-id="' + (item.id||0) + '" data-sku="' + (item.sku||'') + '" value="' + (item.name||'') + '">' +
@@ -93,7 +94,7 @@ jQuery(function ($) {
                       '<div class="qty-btn-group"><button type="button" class="qty-btn qty-increase">▲</button><button type="button" class="qty-btn qty-decrease">▼</button></div>' +
                   '</div>' +
               '</td>' +
-              '<td class="col-price"><input type="number" class="price" step="0.01" value="' + price + '"></td>' +
+              '<td class="col-price"><input type="number" class="price" step="0.01" value="' + price + '"><span class="cig-original-price" style="display:none;"></span></td>' +
               '<td class="col-total"><input type="text" class="row-total" readonly value="' + total + '"></td>' +
               '<td class="col-status no-print">' +
                   '<select class="product-status">' +
@@ -320,6 +321,7 @@ jQuery(function ($) {
         var $row = $(this).closest('tr');
         $row.find('.product-search').attr('data-product-id', ui.item.id || 0).attr('data-sku', ui.item.sku || '').val(ui.item.value || '');
         $row.find('.name-sku-value').text(ui.item.sku || '—'); $row.find('.product-brand').val(ui.item.brand || ''); $row.find('.product-desc').val(ui.item.desc || ''); $row.find('.price').val((ui.item.price || 0).toFixed(2));
+        $row.attr('data-original-price', ui.item.original_price || ui.item.price || 0);
         if (ui.item.image) { $row.find('.product-image').attr('src', ui.item.image).removeClass('cig-placeholder-img'); } else { $row.find('.product-image').attr('src', cigAjax.placeholder_img).addClass('cig-placeholder-img'); }
         if (ui.item.stock !== null) { $row.find('.product-search').attr('title', 'Stock: ' + ui.item.stock); }
         updateRowTotal($row); checkStock($row); return false;
@@ -333,6 +335,7 @@ jQuery(function ($) {
     var $tbody = $('#invoice-items');
     var $new = $tbody.find('tr:last').clone();
     $new.find('input, textarea').val(''); $new.find('.product-search').attr('data-product-id', '0').attr('data-sku', '').removeAttr('title');
+    $new.attr('data-original-price', '0'); $new.find('.cig-original-price').hide();
     $new.find('.name-sku-value').text('—'); $new.find('.product-image').attr('src', cigAjax.placeholder_img).addClass('cig-placeholder-img');
     $new.find('.warranty-period').val(''); $new.find('.quantity').val('1').removeClass('stock-error'); $new.find('.price').val('0.00');
     $new.find('.row-total').val('0.00'); 
@@ -353,8 +356,47 @@ jQuery(function ($) {
   $(document).on('click', '.qty-increase', function () { if (isReadOnly) return; var $inp = $(this).closest('.quantity-wrapper').find('.quantity'); $inp.val((parseInt($inp.val(), 10) || 0) + 1).trigger('input'); });
   $(document).on('click', '.qty-decrease', function () { if (isReadOnly) return; var $inp = $(this).closest('.quantity-wrapper').find('.quantity'); var v = parseInt($inp.val(), 10) || 0; if (v > 1) $inp.val(v - 1).trigger('input'); });
 
-  function updateRowTotal($row) { var qty = parseFloat($row.find('.quantity').val()) || 0; var price = parseFloat($row.find('.price').val()) || 0; $row.find('.row-total').val((qty * price).toFixed(2)); updateGrandTotal(); }
-  function updateGrandTotal() { var total = 0; $('#invoice-items tr').each(function () { var $row = $(this); var status = $row.find('.product-status').val(); if (status !== 'canceled') { total += parseFloat($row.find('.row-total').val()) || 0; } }); $('#grand-total').text(total.toFixed(2)); renderPaymentHistory(); }
+  function updateRowTotal($row) {
+    var qty = parseFloat($row.find('.quantity').val()) || 0;
+    var price = parseFloat($row.find('.price').val()) || 0;
+    $row.find('.row-total').val((qty * price).toFixed(2));
+    // Show/hide discount indicator
+    var origPrice = parseFloat($row.attr('data-original-price')) || 0;
+    var $discEl = $row.find('.cig-original-price');
+    if (origPrice > 0 && price < origPrice) {
+      var pct = Math.round((1 - price / origPrice) * 100);
+      if ($discEl.length) {
+        $discEl.text(origPrice.toFixed(2) + ' (-' + pct + '%)').show();
+      }
+    } else {
+      if ($discEl.length) $discEl.hide();
+    }
+    updateGrandTotal();
+  }
+  function updateGrandTotal() {
+    var total = 0;
+    var totalDiscount = 0;
+    $('#invoice-items tr').each(function () {
+      var $row = $(this);
+      var status = $row.find('.product-status').val();
+      if (status !== 'canceled') {
+        total += parseFloat($row.find('.row-total').val()) || 0;
+        var origPrice = parseFloat($row.attr('data-original-price')) || 0;
+        var price = parseFloat($row.find('.price').val()) || 0;
+        var qty = parseFloat($row.find('.quantity').val()) || 0;
+        if (origPrice > 0 && price < origPrice) {
+          totalDiscount += (origPrice - price) * qty;
+        }
+      }
+    });
+    $('#grand-total').text(total.toFixed(2));
+    if (totalDiscount > 0.01) {
+      $('#cig-discount-summary').text((cigAjax.i18n?.total_discount || 'Discount') + ': ' + totalDiscount.toFixed(2) + ' ₾').show();
+    } else {
+      $('#cig-discount-summary').hide();
+    }
+    renderPaymentHistory();
+  }
   $(document).on('input', '.quantity', function () { var $row = $(this).closest('tr'); updateRowTotal($row); checkStock($row); });
   $(document).on('input', '.price', function () { updateRowTotal($(this).closest('tr')); });
 
@@ -380,14 +422,15 @@ jQuery(function ($) {
         var resDays = parseInt(it.reservation_days, 10) || defaultReservationDays;
         var st = it.status || 'none'; // Default to none if undefined
         var img = it.image || cigAjax.placeholder_img; var phClass = it.image ? '' : 'cig-placeholder-img';
-        
-        var $row = $('<tr><td class="col-n">'+(i+1)+'</td>' +
+        var origP = parseFloat(it.original_price || it.price || 0);
+
+        var $row = $('<tr data-original-price="'+origP+'"><td class="col-n">'+(i+1)+'</td>' +
           '<td class="col-name"><input type="text" class="product-search" data-product-id="'+(it.product_id||0)+'" data-sku="'+(it.sku||'')+'" value="'+(it.name||'')+'"><div class="name-sub"><span class="name-sku-label">' + (cigAjax.i18n?.code_label || 'Code:') + '</span> <span class="name-sku-value">'+(it.sku||'—')+'</span></div></td>' +
           '<td class="col-image"><img class="product-image '+phClass+'" src="'+img+'"><select class="warranty-period" style="width:100%;margin-top:5px;font-size:10px;"><option value="">---</option><option value="6m">' + (cigAjax.i18n?.warranty_6m || '6 Months') + '</option><option value="1y">' + (cigAjax.i18n?.warranty_1y || '1 Year') + '</option><option value="2y">' + (cigAjax.i18n?.warranty_2y || '2 Years') + '</option><option value="3y">' + (cigAjax.i18n?.warranty_3y || '3 Years') + '</option></select></td>' +
           '<td class="col-brand"><input type="text" class="product-brand" readonly value="'+(it.brand||'')+'"></td>' +
           '<td class="col-desc"><textarea class="product-desc">'+(it.desc||'')+'</textarea></td>' +
           '<td class="col-qty"><div class="quantity-wrapper"><input type="number" class="quantity" min="1" value="'+(it.qty||1)+'"><div class="qty-btn-group"><button type="button" class="qty-btn qty-increase">▲</button><button type="button" class="qty-btn qty-decrease">▼</button></div></div></td>' +
-          '<td class="col-price"><input type="number" class="price" step="0.01" value="'+parseFloat(it.price||0).toFixed(2)+'"></td>' +
+          '<td class="col-price"><input type="number" class="price" step="0.01" value="'+parseFloat(it.price||0).toFixed(2)+'"><span class="cig-original-price" style="display:none;"></span></td>' +
           '<td class="col-total"><input type="text" class="row-total" readonly value="'+parseFloat(it.total||0).toFixed(2)+'"></td>' +
           '<td class="col-status no-print">' +
             '<select class="product-status">' +
@@ -402,6 +445,7 @@ jQuery(function ($) {
         $row.find('.product-status').val(st);
         $row.find('.warranty-period').val(it.warranty || '');
         $tbody.append($row); initAutocomplete($row.find('.product-search'));
+        updateRowTotal($row);
       });
       updateGrandTotal();
     }
@@ -453,6 +497,7 @@ jQuery(function ($) {
         image: $r.find('.product-image').attr('src'),
         qty: parseFloat($r.find('.quantity').val()) || 0,
         price: parseFloat($r.find('.price').val()) || 0,
+        original_price: parseFloat($r.attr('data-original-price')) || parseFloat($r.find('.price').val()) || 0,
         total: parseFloat($r.find('.row-total').val()) || 0,
         status: finalStatus,
         reservation_days: resDays,

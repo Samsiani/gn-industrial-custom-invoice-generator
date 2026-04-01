@@ -254,11 +254,14 @@ class CIG_Ajax_Invoices {
                 }
             }
 
+            // Preserve original price (defaults to current price for backward compat)
+            $item['original_price'] = floatval($item['original_price'] ?? $item['price'] ?? 0);
+
             // BUG FIX: Explicitly calculate item_total (qty * price) to ensure it's not 0
             $qty   = floatval($item['qty'] ?? 0);
             $price = floatval($item['price'] ?? 0);
             $item_total = floatval($item['total'] ?? 0);
-            
+
             // Calculate total if missing or zero
             if ($item_total <= 0 && $qty > 0 && $price > 0) {
                 $item['total'] = $qty * $price;
@@ -628,6 +631,8 @@ class CIG_Ajax_Invoices {
                 }
             }
 
+            $original_price = floatval($item['original_price'] ?? $price);
+
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
             $wpdb->insert(
                 $this->table_items,
@@ -639,13 +644,14 @@ class CIG_Ajax_Invoices {
                     'description'       => sanitize_textarea_field($item['desc'] ?? $item['description'] ?? ''),
                     'quantity'          => $qty,
                     'price'             => $price,
+                    'original_price'    => $original_price,
                     'total'             => $total,
                     'item_status'       => sanitize_text_field($item['status'] ?? 'none'),
                     'warranty_duration' => sanitize_text_field($item['warranty'] ?? ''),
                     'reservation_days'  => intval($item['reservation_days'] ?? 0),
                     'image'             => $image
                 ],
-                ['%d', '%d', '%s', '%s', '%s', '%f', '%f', '%f', '%s', '%s', '%d', '%s']
+                ['%d', '%d', '%s', '%s', '%s', '%f', '%f', '%f', '%f', '%s', '%s', '%d', '%s']
             );
         }
     }

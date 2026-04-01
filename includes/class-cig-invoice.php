@@ -415,6 +415,7 @@ class CIG_Invoice {
                 'image'            => esc_url_raw($row['image'] ?? ''),
                 'qty'              => floatval($row['qty'] ?? 0),
                 'price'            => floatval($row['price'] ?? 0),
+                'original_price'   => floatval($row['original_price'] ?? $row['price'] ?? 0),
                 'total'            => $item_total,
                 'status'           => $status,
                 'reservation_days' => $reservation_days,

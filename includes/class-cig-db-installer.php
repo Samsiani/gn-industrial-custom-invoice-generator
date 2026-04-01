@@ -44,8 +44,11 @@ class CIG_DB_Installer {
         // Create Payments Table
         self::create_payments_table($charset_collate);
 
+        // Run upgrade routines for existing installations
+        self::maybe_upgrade();
+
         // Update database version
-        update_option('cig_db_version', '2.0.0', false);
+        update_option('cig_db_version', '2.1.0', false);
     }
 
     /**
@@ -134,6 +137,7 @@ class CIG_DB_Installer {
             description text,
             quantity decimal(10,2) DEFAULT 0.00,
             price decimal(10,2) DEFAULT 0.00,
+            original_price decimal(10,2) DEFAULT 0.00,
             total decimal(10,2) DEFAULT 0.00,
             item_status varchar(20) DEFAULT 'none',
             warranty_duration varchar(50) DEFAULT '',
@@ -175,6 +179,20 @@ class CIG_DB_Installer {
         ) $charset_collate;";
 
         dbDelta($sql);
+    }
+
+    /**
+     * Run upgrade routines for schema changes
+     */
+    private static function maybe_upgrade() {
+        global $wpdb;
+        $table_items = $wpdb->prefix . 'cig_invoice_items';
+
+        // Add original_price column if it doesn't exist
+        $col = $wpdb->get_results("SHOW COLUMNS FROM `{$table_items}` LIKE 'original_price'");
+        if (empty($col)) {
+            $wpdb->query("ALTER TABLE `{$table_items}` ADD COLUMN `original_price` decimal(10,2) DEFAULT 0.00 AFTER `price`");
+        }
     }
 
     /**
@@ -222,7 +240,7 @@ class CIG_DB_Installer {
      */
     public static function needs_upgrade() {
         $current_version = self::get_db_version();
-        return version_compare($current_version, '2.0.0', '<');
+        return version_compare($current_version, '2.1.0', '<');
     }
 
     /**

@@ -124,6 +124,7 @@ class CIG_Ajax_Statistics {
                 'total_reserved' => 0,
                 'total_reserved_invoices' => 0,
                 'total_outstanding' => 0,
+                'total_discount' => 0,
             ]);
         }
 
@@ -259,12 +260,13 @@ class CIG_Ajax_Statistics {
             $params_items[] = $search_like;
         }
 
-        $sql_items = "SELECT 
+        $sql_items = "SELECT
             COALESCE(SUM(CASE WHEN it.item_status = 'sold' THEN it.quantity ELSE 0 END), 0) as total_sold,
             COALESCE(SUM(CASE WHEN it.item_status = 'reserved' THEN it.quantity ELSE 0 END), 0) as total_reserved,
-            COUNT(DISTINCT CASE WHEN it.item_status = 'reserved' THEN it.invoice_id END) as reserved_invoices_count
-            FROM {$this->table_invoices} i 
-            LEFT JOIN {$this->table_items} it ON i.id = it.invoice_id 
+            COUNT(DISTINCT CASE WHEN it.item_status = 'reserved' THEN it.invoice_id END) as reserved_invoices_count,
+            COALESCE(SUM(CASE WHEN it.original_price > it.price AND it.item_status != 'canceled' THEN (it.original_price - it.price) * it.quantity ELSE 0 END), 0) as total_discount
+            FROM {$this->table_invoices} i
+            LEFT JOIN {$this->table_items} it ON i.id = it.invoice_id
             LEFT JOIN {$this->table_customers} c ON i.customer_id = c.id
             {$where_items}";
 
@@ -298,6 +300,7 @@ class CIG_Ajax_Statistics {
             'total_reserved' => (int)($items_data['total_reserved'] ?? 0),
             'total_reserved_invoices' => (int)($items_data['reserved_invoices_count'] ?? 0),
             'total_outstanding' => (float)$total_outstanding,
+            'total_discount' => (float)($items_data['total_discount'] ?? 0),
         ]);
     }
 

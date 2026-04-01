@@ -542,6 +542,8 @@ class CIG_Invoice_Manager {
                 }
             }
 
+            $original_price = floatval($item['original_price'] ?? $price);
+
             $result = $wpdb->insert(
                 $this->table_items,
                 [
@@ -552,13 +554,14 @@ class CIG_Invoice_Manager {
                     'description'       => sanitize_textarea_field($item['description'] ?? $item['desc'] ?? ''),
                     'quantity'          => $qty,
                     'price'             => $price,
+                    'original_price'    => $original_price,
                     'total'             => $total,
                     'item_status'       => sanitize_text_field($item['item_status'] ?? $item['status'] ?? 'none'),
                     'warranty_duration' => sanitize_text_field($item['warranty_duration'] ?? $item['warranty'] ?? ''),
                     'reservation_days'  => intval($item['reservation_days'] ?? 0),
                     'image'             => $image
                 ],
-                ['%d', '%d', '%s', '%s', '%s', '%f', '%f', '%f', '%s', '%s', '%d', '%s']
+                ['%d', '%d', '%s', '%s', '%s', '%f', '%f', '%f', '%f', '%s', '%s', '%d', '%s']
             );
 
             if (false === $result) {
@@ -1021,6 +1024,7 @@ class CIG_Invoice_Manager {
                     'sku'               => sanitize_text_field($item['sku'] ?? ''),
                     'quantity'          => floatval($item['qty'] ?? 0),
                     'price'             => floatval($item['price'] ?? 0),
+                    'original_price'    => floatval($item['original_price'] ?? $item['price'] ?? 0),
                     'item_status'       => sanitize_text_field($item['status'] ?? 'none'),
                     'warranty_duration' => sanitize_text_field($item['warranty'] ?? ''),
                     'reservation_days'  => intval($item['reservation_days'] ?? 0),

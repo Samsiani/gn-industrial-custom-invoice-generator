@@ -57,6 +57,7 @@ foreach ($items_raw as $item) {
         'image'            => $item['image'] ?? '',
         'qty'              => $item_qty,
         'price'            => $item_price,
+        'original_price'   => floatval($item['original_price'] ?? $item_price),
         'total'            => $item_total,
         'status'           => $item['item_status'] ?? $item['status'] ?? 'none',
         'reservation_days' => $item['reservation_days'] ?? 0,
@@ -231,7 +232,7 @@ $current_user = wp_get_current_user();
             $warranty = $item['warranty'] ?? '';
             $img_src = !empty($item['image']) ? $item['image'] : CIG_ASSETS_URL . 'img/placeholder-80x70.png';
         ?>
-        <tr class="cig-item-row" data-row="<?php echo esc_attr($row_id); ?>">
+        <tr class="cig-item-row" data-row="<?php echo esc_attr($row_id); ?>" data-original-price="<?php echo esc_attr($item['original_price'] ?? $item['price']); ?>">
           <td class="col-n row-num"><?php echo esc_html($row_id); ?></td>
           <td class="col-name">
             <input type="text" class="product-search" placeholder="<?php esc_attr_e('Search SKU or Name', 'cig'); ?>" 
@@ -264,7 +265,7 @@ $current_user = wp_get_current_user();
               </div>
             </div>
           </td>
-          <td class="col-price"><input type="number" class="price" value="<?php echo esc_attr($item['price']); ?>" step="0.01"></td>
+          <td class="col-price"><input type="number" class="price" value="<?php echo esc_attr($item['price']); ?>" step="0.01"><span class="cig-original-price" style="display:none;"></span></td>
           <td class="col-total"><input type="text" class="row-total" value="<?php echo esc_attr($item['total']); ?>" readonly></td>
           <td class="col-status no-print">
             <select class="product-status">
@@ -278,7 +279,7 @@ $current_user = wp_get_current_user();
           <td class="col-actions no-print"><button type="button" class="btn-remove-row">X</button></td>
         </tr>
         <?php endforeach; else: ?>
-        <tr class="cig-item-row" data-row="1">
+        <tr class="cig-item-row" data-row="1" data-original-price="0">
             <td class="col-n row-num">1</td>
             <td class="col-name">
                 <input type="text" class="product-search" placeholder="<?php esc_attr_e('Search SKU or Name', 'cig'); ?>" data-product-id="0" data-sku="">
@@ -302,7 +303,7 @@ $current_user = wp_get_current_user();
                     <div class="qty-btn-group"><button type="button" class="qty-btn qty-increase">▲</button><button type="button" class="qty-btn qty-decrease">▼</button></div>
                 </div>
             </td>
-            <td class="col-price"><input type="number" class="price" value="0.00" step="0.01"></td>
+            <td class="col-price"><input type="number" class="price" value="0.00" step="0.01"><span class="cig-original-price" style="display:none;"></span></td>
             <td class="col-total"><input type="text" class="row-total" value="0.00" readonly></td>
             <td class="col-status no-print">
                 <select class="product-status">
@@ -335,6 +336,7 @@ $current_user = wp_get_current_user();
           </tr>
         </tbody>
       </table>
+      <div id="cig-discount-summary" class="cig-discount-summary" style="display:none;"></div>
     </div>
 
     <div class="invoice-payment-section no-print" style="margin-top:20px; padding:0; border:none; background:transparent;">

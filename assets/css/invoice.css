@@ -346,6 +346,9 @@ input[type=number] { -moz-appearance: textfield; }
 
   .status-badge { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   .stock-warning { display: none !important; }
+  .cig-original-price { color: #999 !important; font-size: 8pt !important; }
+  .cig-discounted-price { color: #28a745 !important; font-weight: bold !important; }
+  .cig-discount-summary { background: #fff3cd !important; color: #856404 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
 
 /* Responsive */
@@ -362,6 +365,11 @@ input[type=number] { -moz-appearance: textfield; }
   .signature-image { margin-left: 0; }
   .payment-split-row { flex-direction: column; gap: 10px; }
 }
+
+/* Discount display */
+.cig-original-price { text-decoration: line-through; color: #999; font-size: 0.85em; display: block; }
+.cig-discounted-price { color: #28a745; font-weight: bold; }
+.cig-discount-summary { margin-top: 8px; padding: 6px 12px; background: #fff3cd; color: #856404; border-radius: 4px; font-size: 13px; font-weight: 500; text-align: right; }
 
 /* Util */
 .cig-hidden { display: none !important; }

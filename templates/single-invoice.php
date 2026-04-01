@@ -182,6 +182,7 @@ $payment_methods_map = [
     <tbody id="invoice-items">
       <?php 
       $grand = 0;
+      $total_discount = 0;
       foreach ($items as $idx=>$row):
         $n=$idx+1;
         // Support both custom table field names and legacy field names
@@ -192,6 +193,8 @@ $payment_methods_map = [
         $image=$row['image'] ?? '';
         $qty=floatval($row['quantity'] ?? $row['qty'] ?? 0);
         $price=floatval($row['price'] ?? 0);
+        $original_price=floatval($row['original_price'] ?? $price);
+        $has_discount=($original_price > $price && $original_price > 0);
         $total=floatval($row['total'] ?? ($qty*$price));
         
         // --- STATUS LOGIC FOR VIEW ---
@@ -201,6 +204,9 @@ $payment_methods_map = [
         
         if ($status !== 'canceled') {
             $grand += $total;
+            if ($has_discount) {
+                $total_discount += ($original_price - $price) * $qty;
+            }
         }
 
         // Status Badge Logic
@@ -236,8 +242,22 @@ $payment_methods_map = [
           <td class="col-brand"><?php echo esc_html($brand); ?></td>
           <td class="col-desc"><div style="white-space:pre-wrap;"><?php echo esc_html($desc); ?></div></td>
           <td class="col-qty"><?php echo esc_html($qty); ?></td>
-          <td class="col-price"><?php echo number_format($price,2,'.',''); ?></td>
-          <td class="col-total"><?php echo number_format($total,2,'.',''); ?></td>
+          <td class="col-price">
+            <?php if ($has_discount): ?>
+              <del class="cig-original-price"><?php echo number_format($original_price,2,'.',''); ?></del>
+              <span class="cig-discounted-price"><?php echo number_format($price,2,'.',''); ?></span>
+            <?php else: ?>
+              <?php echo number_format($price,2,'.',''); ?>
+            <?php endif; ?>
+          </td>
+          <td class="col-total">
+            <?php if ($has_discount): ?>
+              <del class="cig-original-price"><?php echo number_format($original_price * $qty,2,'.',''); ?></del>
+              <span class="cig-discounted-price"><?php echo number_format($total,2,'.',''); ?></span>
+            <?php else: ?>
+              <?php echo number_format($total,2,'.',''); ?>
+            <?php endif; ?>
+          </td>
           <td class="col-status no-print"><span class="status-badge" style="background:<?php echo esc_attr($status_color); ?>;color:#fff;padding:3px 8px;border-radius:3px;font-size:11px;font-weight:bold;white-space:nowrap;"><?php echo esc_html($status_label); ?></span></td>
         </tr>
       <?php endforeach; ?>
@@ -306,6 +326,12 @@ $payment_methods_map = [
             </tr>
         <?php endif; ?>
 
+        <?php if ($total_discount > 0.01): ?>
+        <tr>
+            <td style="font-size:13px; color:#856404;"><?php esc_html_e('ფასდაკლება', 'cig'); ?></td>
+            <td style="font-size:13px; font-weight:bold; color:#856404;"><?php echo number_format($total_discount, 2, '.', '') . '&nbsp;&#8382;'; ?></td>
+        </tr>
+        <?php endif; ?>
         <tr><td colspan="2" style="text-align:right;font-size:12px;"><?php esc_html_e('Price includes VAT','cig'); ?></td></tr>
       </tbody>
     </table>

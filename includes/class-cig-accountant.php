@@ -204,6 +204,7 @@ class CIG_Accountant {
                         <th style="width: 130px;"><?php esc_html_e('Invoice #', 'cig'); ?></th>
                         <th><?php esc_html_e('Client', 'cig'); ?></th> <th><?php esc_html_e('Payment', 'cig'); ?></th>
                         <th><?php esc_html_e('Total', 'cig'); ?></th>
+                        <th><?php esc_html_e('Discount', 'cig'); ?></th>
                         <th style="text-align:center;"><?php esc_html_e('RS', 'cig'); ?></th>
                         <th style="text-align:center;"><?php esc_html_e('Credit', 'cig'); ?></th>
                         <th style="text-align:center;"><?php esc_html_e('Receipt', 'cig'); ?></th>
@@ -314,7 +315,21 @@ class CIG_Accountant {
                             echo '<td>' . $payment_str . '</td>';
 
                             echo '<td>' . esc_html(number_format($total, 2)) . ' ₾</td>';
-                            
+
+                            // Discount from items
+                            $inv_items = $invoice_data['items'] ?? [];
+                            $inv_discount = 0;
+                            foreach ($inv_items as $ii) {
+                                $ii_price = floatval($ii['price'] ?? 0);
+                                $ii_orig = floatval($ii['original_price'] ?? $ii_price);
+                                $ii_qty = floatval($ii['quantity'] ?? $ii['qty'] ?? 0);
+                                $ii_st = $ii['item_status'] ?? $ii['status'] ?? 'none';
+                                if ($ii_orig > $ii_price && $ii_st !== 'canceled') {
+                                    $inv_discount += ($ii_orig - $ii_price) * $ii_qty;
+                                }
+                            }
+                            echo '<td>' . ($inv_discount > 0.01 ? '<span style="color:#856404; font-weight:bold;">' . esc_html(number_format($inv_discount, 2)) . ' ₾</span>' : '—') . '</td>';
+
                             // Statuses
                             echo '<td style="text-align:center;">' . ($is_rs ? '<span class="dashicons dashicons-cloud-saved" style="color:#28a745;" title="Uploaded"></span>' : '—') . '</td>';
                             echo '<td style="text-align:center;">' . ($is_credit ? '<span class="dashicons dashicons-calendar-alt" style="color:#6c757d;" title="Credit / Installment"></span>' : '—') . '</td>';
@@ -329,7 +344,7 @@ class CIG_Accountant {
                             echo '</tr>';
                         }
                     } else {
-                        echo '<tr><td colspan="13">' . esc_html__('No relevant invoices found.', 'cig') . '</td></tr>';
+                        echo '<tr><td colspan="14">' . esc_html__('No relevant invoices found.', 'cig') . '</td></tr>';
                     }
                     wp_reset_postdata();
                     ?>
