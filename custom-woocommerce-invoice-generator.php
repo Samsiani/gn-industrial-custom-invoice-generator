@@ -299,6 +299,13 @@ final class CIG_Invoice_Generator {
     public function on_plugins_loaded() {
         load_plugin_textdomain('cig', false, dirname(CIG_PLUGIN_BASENAME) . '/languages');
 
+        // Auto-upgrade DB schema when plugin version changes (no reactivation needed)
+        $stored_version = get_option('cig_version', '');
+        if (version_compare($stored_version, CIG_VERSION, '<')) {
+            CIG_DB_Installer::install();
+            update_option('cig_version', CIG_VERSION, false);
+        }
+
         if (!class_exists('WooCommerce')) {
             add_action('admin_notices', function () {
                 echo '<div class="notice notice-error"><p><strong>';

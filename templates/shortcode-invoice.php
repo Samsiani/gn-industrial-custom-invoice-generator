@@ -94,7 +94,7 @@ $current_user = wp_get_current_user();
         </tr>
       </thead>
       <tbody id="invoice-items">
-        <tr>
+        <tr data-original-price="0">
           <td class="col-n">1</td>
           <td class="col-name">
             <input type="text" class="product-search" placeholder="<?php esc_attr_e('Search SKU or Name', 'cig'); ?>" data-product-id="0" data-sku="">
