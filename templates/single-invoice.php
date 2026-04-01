@@ -293,9 +293,17 @@ $payment_methods_map = [
       <tbody>
         <tr>
             <td><?php esc_html_e('Total','cig'); ?></td>
-            <td id="grand-total"><?php echo number_format($grand,2,'.','') . '&nbsp;&#8382;'; ?></td>
+            <td id="grand-total">
+              <?php if ($total_discount > 0.01): ?>
+                <del style="color:#999; font-size:13px; font-weight:normal;"><?php echo number_format($grand + $total_discount, 2, '.', '') . '&nbsp;&#8382;'; ?></del>
+                <span style="font-weight:bold; font-size:16px; color:#333;"><?php echo number_format($grand, 2, '.', '') . '&nbsp;&#8382;'; ?></span>
+                <span style="display:inline-block; margin-left:6px; background:#fff3cd; color:#856404; font-size:11px; font-weight:600; padding:2px 6px; border-radius:3px;">-<?php echo number_format($total_discount, 2, '.', ''); ?> &#8382;</span>
+              <?php else: ?>
+                <?php echo number_format($grand, 2, '.', '') . '&nbsp;&#8382;'; ?>
+              <?php endif; ?>
+            </td>
         </tr>
-        
+
         <?php // Row 2: Show "Cash Paid" IF $cash_total > 0 ?>
         <?php if ($cash_total > 0): ?>
             <tr>
@@ -303,7 +311,7 @@ $payment_methods_map = [
                 <td style="font-size:13px; font-weight:bold; color:#28a745;"><?php echo number_format($cash_total, 2, '.', '') . '&nbsp;&#8382;'; ?></td>
             </tr>
         <?php endif; ?>
-        
+
         <?php // Row 3: Show "Consignment" IF $consignment_total > 0 ?>
         <?php if ($consignment_total > 0): ?>
             <tr>
@@ -311,26 +319,18 @@ $payment_methods_map = [
                 <td style="font-size:13px; font-weight:bold; color:#6c757d;"><?php echo number_format($consignment_total, 2, '.', '') . '&nbsp;&#8382;'; ?></td>
             </tr>
         <?php endif; ?>
-        
-        <?php // Row 4: Show "Remaining/Due" ONLY IF $remaining > 0.01 (If consignment covers balance, hide this row) ?>
+
+        <?php // Row 4: Show "Remaining/Due" ONLY IF $remaining > 0.01 ?>
         <?php if ($remaining > 0.01): ?>
             <tr>
                 <td style="font-size:13px; color:#dc3545;"><?php esc_html_e('დარჩენილია', 'cig'); ?></td>
                 <td style="font-size:13px; font-weight:bold; color:#dc3545;"><?php echo number_format($remaining, 2, '.', '') . '&nbsp;&#8382;'; ?></td>
             </tr>
         <?php elseif ($remaining < -0.01): ?>
-            <?php // Overpaid scenario ?>
             <tr>
                 <td style="font-size:13px; color:#dc3545;"><?php esc_html_e('დარჩენილია', 'cig'); ?></td>
                 <td style="font-size:13px; font-weight:bold; color:#dc3545;"><?php echo number_format($remaining, 2, '.', '') . '&nbsp;&#8382; (ზედმეტი)'; ?></td>
             </tr>
-        <?php endif; ?>
-
-        <?php if ($total_discount > 0.01): ?>
-        <tr>
-            <td style="font-size:13px; color:#856404;"><?php esc_html_e('ფასდაკლება', 'cig'); ?></td>
-            <td style="font-size:13px; font-weight:bold; color:#856404;"><?php echo number_format($total_discount, 2, '.', '') . '&nbsp;&#8382;'; ?></td>
-        </tr>
         <?php endif; ?>
         <tr><td colspan="2" style="text-align:right;font-size:12px;"><?php esc_html_e('Price includes VAT','cig'); ?></td></tr>
       </tbody>
