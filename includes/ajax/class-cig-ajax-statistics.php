@@ -518,11 +518,22 @@ class CIG_Ajax_Statistics {
 
             $payment_labels = CIG_Invoice::get_payment_types();
 
+            // Get original total (before discounts) from items
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+            $orig_tot = (float)$wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT COALESCE(SUM(CASE WHEN original_price > 0 AND original_price > price THEN original_price * quantity ELSE price * quantity END), 0) FROM {$this->table_items} WHERE invoice_id = %d AND item_status != 'canceled'",
+                    $id
+                )
+            );
+            $inv_total = (float)$inv['total_amount'];
+
             $result[] = [
                 'id' => $id,
                 'invoice_number' => $inv['invoice_number'],
                 'date' => $inv['sale_date'] ?? $inv['created_at'],
-                'invoice_total' => (float)$inv['total_amount'],
+                'invoice_total' => $inv_total,
+                'original_total' => ($orig_tot > $inv_total + 0.01) ? $orig_tot : 0,
                 'payment_type' => $pt,
                 'payment_label' => $payment_labels[$pt] ?? $pt,
                 'total_products' => $tot,
@@ -769,6 +780,15 @@ class CIG_Ajax_Statistics {
             $tot = (float)$inv['total_amount'];
             $pd = (float)$inv['paid_amount'];
 
+            // Get original total (before discounts) from items
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+            $original_total = (float)$wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT COALESCE(SUM(CASE WHEN original_price > 0 AND original_price > price THEN original_price * quantity ELSE price * quantity END), 0) FROM {$this->table_items} WHERE invoice_id = %d AND item_status != 'canceled'",
+                    $id
+                )
+            );
+
             // Get author name
             $author_name = '';
             if ($inv['author_id']) {
@@ -782,6 +802,7 @@ class CIG_Ajax_Statistics {
                 'customer' => $inv['customer_name'] ?: '—',
                 'payment_methods' => implode(', ', array_unique($inv_m)),
                 'total' => $tot,
+                'original_total' => ($original_total > $tot + 0.01) ? $original_total : 0,
                 'paid' => $pd,
                 'paid_breakdown' => $bd,
                 'due' => max(0, $tot - $pd),

@@ -338,12 +338,23 @@ class CIG_Ajax_Dashboard {
                 $payment_title = '—';
             }
 
+            // Get original total from items for discount display
+            global $wpdb;
+            $table_items = $wpdb->prefix . 'cig_invoice_items';
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+            $orig_tot = (float)$wpdb->get_var($wpdb->prepare(
+                "SELECT COALESCE(SUM(CASE WHEN original_price > 0 AND original_price > price THEN original_price * quantity ELSE price * quantity END), 0) FROM {$table_items} WHERE invoice_id = %d AND item_status != 'canceled'",
+                $id
+            ));
+            $total_num = (float)$total;
+
             $invoices[] = [
                 'id'          => $id,
                 'number'      => get_post_meta($id, '_cig_invoice_number', true),
                 'date'        => date('Y-m-d', strtotime($date)),
                 'sold_date'   => $sold_date ?: '',
-                'total'       => number_format((float)$total, 2) . ' ₾',
+                'total'       => number_format($total_num, 2) . ' ₾',
+                'original_total' => ($orig_tot > $total_num + 0.01) ? number_format($orig_tot, 2) . ' ₾' : '',
                 'client_name' => $buyer_name,
                 'client_tax'  => $buyer_tax,
                 'view_url'    => get_permalink($id),

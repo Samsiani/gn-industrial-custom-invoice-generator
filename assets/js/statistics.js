@@ -740,7 +740,7 @@ jQuery(function ($) {
                       html += '<tr>';
                       html += '<td><strong>' + escapeHtml(inv.invoice_number || '') + '</strong></td>';
                       html += '<td>' + escapeHtml(inv.customer) + '</td>';
-                      html += '<td><strong>' + formatCurrency(inv.total || 0) + '</strong></td>';
+                      html += '<td>' + formatTotalWithDiscount(inv.total || 0, inv.original_total) + '</td>';
                       html += '<td>' + formatDateTime(inv.date) + '</td>';
                       html += '<td>' + escapeHtml(inv.author || '') + '</td>';
                       html += '<td><a class="cig-btn-sm cig-btn-view" href="' + inv.view_url + '" target="_blank">ნახვა</a> <a class="cig-btn-sm cig-btn-edit" href="' + inv.edit_url + '" target="_blank">რედაქტირება</a></td>';
@@ -1310,7 +1310,7 @@ jQuery(function ($) {
     var html = '';
     pageData.forEach(function(inv){
       var paymentClass = 'payment-' + inv.payment_type;
-      html += '<tr><td><strong>' + escapeHtml(inv.invoice_number) + '</strong></td><td>' + formatDateTime(inv.date) + '</td><td>' + formatNumber(inv.total_products) + '</td><td><span class="cig-badge badge-sold">' + formatNumber(inv.sold_items) + '</span></td><td><span class="cig-badge badge-reserved">' + formatNumber(inv.reserved_items) + '</span></td><td><span class="cig-badge badge-canceled">' + formatNumber(inv.canceled_items) + '</span></td><td><strong>' + formatCurrency(inv.invoice_total) + '</strong></td><td><span class="badge-payment ' + paymentClass + '">' + escapeHtml(inv.payment_label) + '</span></td><td><a href="' + inv.view_url + '" class="cig-btn-sm cig-btn-view" target="_blank">ნახვა</a> <a href="' + inv.edit_url + '" class="cig-btn-sm cig-btn-edit" target="_blank">რედაქტირება</a></td></tr>';
+      html += '<tr><td><strong>' + escapeHtml(inv.invoice_number) + '</strong></td><td>' + formatDateTime(inv.date) + '</td><td>' + formatNumber(inv.total_products) + '</td><td><span class="cig-badge badge-sold">' + formatNumber(inv.sold_items) + '</span></td><td><span class="cig-badge badge-reserved">' + formatNumber(inv.reserved_items) + '</span></td><td><span class="cig-badge badge-canceled">' + formatNumber(inv.canceled_items) + '</span></td><td>' + formatTotalWithDiscount(inv.invoice_total, inv.original_total) + '</td><td><span class="badge-payment ' + paymentClass + '">' + escapeHtml(inv.payment_label) + '</span></td><td><a href="' + inv.view_url + '" class="cig-btn-sm cig-btn-view" target="_blank">ნახვა</a> <a href="' + inv.edit_url + '" class="cig-btn-sm cig-btn-edit" target="_blank">რედაქტირება</a></td></tr>';
     });
     $('#cig-user-invoices-tbody').html(html); renderPagination('invoices');
   }
@@ -1370,7 +1370,7 @@ jQuery(function ($) {
             html += '<td><strong>' + escapeHtml(inv.invoice_number || '') + '</strong></td>';
             html += '<td>' + escapeHtml(inv.customer) + '</td>';
             html += '<td>' + escapeHtml(inv.payment_methods) + '</td>';
-            html += '<td><strong>' + formatCurrency(inv.total || 0) + '</strong></td>';
+            html += '<td>' + formatTotalWithDiscount(inv.total || 0, inv.original_total) + '</td>';
             html += '<td style="' + paidClass + '">' + paidHtml + '</td>';
             html += '<td style="' + dueClass + '">' + formatCurrency(inv.due || 0) + '</td>';
             // Click-to-Edit Date Cell
@@ -1427,7 +1427,7 @@ jQuery(function ($) {
                       html += '<td><strong>' + escapeHtml(inv.invoice_number) + '</strong></td>';
                       html += '<td>' + escapeHtml(inv.customer) + '</td>';
                       html += '<td>' + escapeHtml(inv.payment_methods) + '</td>';
-                      html += '<td>' + formatCurrency(inv.total) + '</td>';
+                      html += '<td>' + formatTotalWithDiscount(inv.total, inv.original_total) + '</td>';
                       html += '<td style="color:#28a745;">' + paidHtml + '</td>';
                       html += '<td style="color:#dc3545;font-weight:bold;">' + formatCurrency(inv.due) + '</td>';
                       html += '<td>' + escapeHtml(inv.author) + '</td>';
@@ -1627,7 +1627,7 @@ jQuery(function ($) {
           html += '<tr>';
           html += '<td><a href="' + inv.view_url + '" target="_blank" style="font-weight:bold;color:#50529d;">' + inv.number + '</a></td>';
           html += '<td>' + inv.date + '</td>';
-          html += '<td>' + formatCurrency(inv.total) + '</td>';
+          html += '<td>' + formatTotalWithDiscount(inv.total, inv.original_total) + '</td>';
           html += '<td style="color:#28a745;">' + formatCurrency(inv.paid) + '</td>';
           html += '<td style="color:#dc3545;">' + formatCurrency(inv.due) + '</td>';
           html += '<td>' + statusBadge + '</td>';
@@ -1640,6 +1640,12 @@ jQuery(function ($) {
   // Utility functions
   function formatNumber(num) { return parseFloat(num || 0).toLocaleString('en-US'); }
   function formatCurrency(amount) { return parseFloat(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₾'; }
+  function formatTotalWithDiscount(total, originalTotal) {
+    if (originalTotal && originalTotal > total + 0.01) {
+      return '<del style="color:#999;font-size:0.85em;font-weight:normal;">' + formatCurrency(originalTotal) + '</del> <strong>' + formatCurrency(total) + '</strong>';
+    }
+    return '<strong>' + formatCurrency(total) + '</strong>';
+  }
   function formatDateTime(dateString) { if (!dateString) return '-'; var date = new Date(dateString.replace(' ', 'T')); return date.toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
   function formatDateShort(dateString) { if (!dateString) return '-'; var date = new Date(dateString.replace(' ', 'T')); return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); }
   function formatDate(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }

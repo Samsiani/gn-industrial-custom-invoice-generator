@@ -122,7 +122,12 @@ jQuery(function($) {
                 var colPay = '<div style="font-size:13px; font-weight:500;">' + (inv.payment_title || '—') + '</div>';
                 if (inv.payment_desc) colPay += '<div style="font-size:10px; color:#777; margin-top:2px;">' + inv.payment_desc + '</div>';
 
-                var colTotal = '<strong style="font-size:13px;">' + inv.total + '</strong>';
+                var colTotal = '';
+                if (inv.original_total) {
+                    colTotal = '<del style="color:#999;font-size:11px;font-weight:normal;">' + inv.original_total + '</del> <strong style="font-size:13px;">' + inv.total + '</strong>';
+                } else {
+                    colTotal = '<strong style="font-size:13px;">' + inv.total + '</strong>';
+                }
                 if (inv.is_partial) colTotal += '<div style="font-size:9px;color:#e0a800;font-weight:bold;text-transform:uppercase;">(' + (cigAjax.i18n?.partial || 'Partial') + ')</div>';
 
                 var btnAttrs = 'data-id="' + inv.id + '" ' + 

@@ -244,7 +244,7 @@ jQuery(function ($) {
       // Column 3: Date
       html += '<td>' + formatDateTime(invoice.date) + '</td>';
       // Column 4: Total
-      html += '<td><strong>' + formatCurrency(invoice.invoice_total) + '</strong></td>';
+      html += '<td>' + (invoice.original_total ? '<del style="color:#999;font-size:0.85em;font-weight:normal;">' + formatCurrency(invoice.original_total) + '</del> ' : '') + '<strong>' + formatCurrency(invoice.invoice_total) + '</strong></td>';
       // Column 5: Payment
       html += '<td><span class="cig-mini-payment-badge ' + paymentClass + '">' + escapeHtml(invoice.payment_label) + '</span></td>';
       // Column 6: Status (Icons)

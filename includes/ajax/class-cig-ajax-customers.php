@@ -259,15 +259,25 @@ class CIG_Ajax_Customers {
             $total = floatval($row['total_amount']);
             $paid = floatval($row['paid_amount']);
             $due = max(0, $total - $paid);
-            
+            $inv_id = intval($row['id']);
+
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+            $orig_tot = (float)$wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT COALESCE(SUM(CASE WHEN original_price > 0 AND original_price > price THEN original_price * quantity ELSE price * quantity END), 0) FROM {$this->table_items} WHERE invoice_id = %d AND item_status != 'canceled'",
+                    $inv_id
+                )
+            );
+
             $invoices[] = [
                 'number' => $row['invoice_number'] ?: '—',
                 'date' => $row['sale_date'] ? substr($row['sale_date'], 0, 10) : '—',
                 'total' => $total,
+                'original_total' => ($orig_tot > $total + 0.01) ? $orig_tot : 0,
                 'paid' => $paid,
                 'due' => $due,
                 'status' => ($due < 0.01) ? 'Paid' : 'Unpaid',
-                'view_url' => get_permalink(intval($row['id']))
+                'view_url' => get_permalink($inv_id)
             ];
         }
 
