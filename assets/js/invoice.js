@@ -95,7 +95,7 @@ jQuery(function ($) {
                   '</div>' +
               '</td>' +
               '<td class="col-price"><input type="number" class="price" step="0.01" value="' + price + '"><span class="cig-original-price" style="display:none;"></span></td>' +
-              '<td class="col-total"><input type="number" class="row-total" step="0.01" value="' + total + '"></td>' +
+              '<td class="col-total"><input type="number" class="row-total" step="0.01" value="' + total + '"><span class="cig-original-total" style="display:none;"></span></td>' +
               '<td class="col-status no-print">' +
                   '<select class="product-status">' +
                       '<option value="none">---</option>' +
@@ -360,18 +360,23 @@ jQuery(function ($) {
     var qty = parseFloat($row.find('.quantity').val()) || 0;
     var price = parseFloat($row.find('.price').val()) || 0;
     $row.find('.row-total').val((qty * price).toFixed(2));
-    // Show/hide discount indicator
+    updateDiscountDisplay($row);
+    updateGrandTotal();
+  }
+  function updateDiscountDisplay($row) {
+    var qty = parseFloat($row.find('.quantity').val()) || 0;
+    var price = parseFloat($row.find('.price').val()) || 0;
     var origPrice = parseFloat($row.attr('data-original-price')) || 0;
-    var $discEl = $row.find('.cig-original-price');
+    var $discPrice = $row.find('.cig-original-price');
+    var $discTotal = $row.find('.cig-original-total');
     if (origPrice > 0 && price < origPrice) {
       var pct = Math.round((1 - price / origPrice) * 100);
-      if ($discEl.length) {
-        $discEl.text(origPrice.toFixed(2) + ' (-' + pct + '%)').show();
-      }
+      if ($discPrice.length) $discPrice.text(origPrice.toFixed(2) + ' (-' + pct + '%)').show();
+      if ($discTotal.length) $discTotal.text((origPrice * qty).toFixed(2) + ' (-' + pct + '%)').show();
     } else {
-      if ($discEl.length) $discEl.hide();
+      if ($discPrice.length) $discPrice.hide();
+      if ($discTotal.length) $discTotal.hide();
     }
-    updateGrandTotal();
   }
   function updateGrandTotal() {
     var total = 0;
@@ -405,19 +410,9 @@ jQuery(function ($) {
     var qty = parseFloat($row.find('.quantity').val()) || 0;
     var newTotal = parseFloat($(this).val()) || 0;
     if (qty > 0) {
-      var newPrice = (newTotal / qty);
-      $row.find('.price').val(newPrice.toFixed(2));
+      $row.find('.price').val((newTotal / qty).toFixed(2));
     }
-    // Update discount display
-    var origPrice = parseFloat($row.attr('data-original-price')) || 0;
-    var price = parseFloat($row.find('.price').val()) || 0;
-    var $discEl = $row.find('.cig-original-price');
-    if (origPrice > 0 && price < origPrice) {
-      var pct = Math.round((1 - price / origPrice) * 100);
-      if ($discEl.length) $discEl.text(origPrice.toFixed(2) + ' (-' + pct + '%)').show();
-    } else {
-      if ($discEl.length) $discEl.hide();
-    }
+    updateDiscountDisplay($row);
     updateGrandTotal();
   });
 
@@ -452,7 +447,7 @@ jQuery(function ($) {
           '<td class="col-desc"><textarea class="product-desc">'+(it.desc||'')+'</textarea></td>' +
           '<td class="col-qty"><div class="quantity-wrapper"><input type="number" class="quantity" min="1" value="'+(it.qty||1)+'"><div class="qty-btn-group"><button type="button" class="qty-btn qty-increase">▲</button><button type="button" class="qty-btn qty-decrease">▼</button></div></div></td>' +
           '<td class="col-price"><input type="number" class="price" step="0.01" value="'+parseFloat(it.price||0).toFixed(2)+'"><span class="cig-original-price" style="display:none;"></span></td>' +
-          '<td class="col-total"><input type="number" class="row-total" step="0.01" value="'+parseFloat(it.total||0).toFixed(2)+'"></td>' +
+          '<td class="col-total"><input type="number" class="row-total" step="0.01" value="'+parseFloat(it.total||0).toFixed(2)+'"><span class="cig-original-total" style="display:none;"></span></td>' +
           '<td class="col-status no-print">' +
             '<select class="product-status">' +
                 '<option value="none">---</option>' +
