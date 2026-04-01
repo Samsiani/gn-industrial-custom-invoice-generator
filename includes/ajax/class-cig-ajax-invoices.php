@@ -403,8 +403,10 @@ class CIG_Ajax_Invoices {
             // Update existing invoice in custom tables
             $this->update_invoice_in_manager($pid, $manager_data, $st, $hist);
         } else {
-            // Create new invoice in custom tables
-            $this->create_invoice_in_manager($pid, $manager_data, $sale_date);
+            $final_num = $this->create_invoice_in_manager($pid, $manager_data, $sale_date);
+            if ($final_num && $final_num !== $new_num) {
+                $new_num = $final_num;
+            }
         }
         
         // Update Stock
@@ -440,7 +442,7 @@ class CIG_Ajax_Invoices {
      * @param int    $post_id    WordPress post ID (used as invoice ID)
      * @param array  $data       Invoice data
      * @param string $sale_date  Calculated sale_date
-     * @return void
+     * @return string|null Final invoice number (may differ from input if duplicate retry occurred)
      */
     private function create_invoice_in_manager($post_id, $data, $sale_date) {
         global $wpdb;
@@ -451,37 +453,64 @@ class CIG_Ajax_Invoices {
         }
 
         $now = current_time('mysql');
-        
+
         // Handle sold_date - use provided value or null
         $sold_date = !empty($data['sold_date']) ? sanitize_text_field($data['sold_date']) : null;
 
-        // Insert invoice record with explicit ID matching WordPress post ID
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-        $wpdb->insert(
-            $this->table_invoices,
-            [
-                'id'               => $post_id,
-                'invoice_number'   => $data['invoice_number'],
-                'customer_id'      => intval($data['customer_id']),
-                'status'           => $data['status'],
-                'lifecycle_status' => $data['lifecycle_status'],
-                'total_amount'     => floatval($data['total_amount']),
-                'paid_amount'      => floatval($data['paid_amount']),
-                'created_at'       => $now,
-                'sale_date'        => $sale_date,
-                'sold_date'        => $sold_date,
-                'author_id'        => intval($data['author_id']),
-                'general_note'     => $data['general_note'],
-                'is_rs_uploaded'   => 0
-            ],
-            ['%d', '%s', '%d', '%s', '%s', '%f', '%f', '%s', '%s', '%s', '%d', '%s', '%d']
-        );
+        $invoice_number = $data['invoice_number'];
+        $max_retries = 3;
+
+        for ($attempt = 0; $attempt < $max_retries; $attempt++) {
+            // Insert invoice record with explicit ID matching WordPress post ID
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+            $result = $wpdb->insert(
+                $this->table_invoices,
+                [
+                    'id'               => $post_id,
+                    'invoice_number'   => $invoice_number,
+                    'customer_id'      => intval($data['customer_id']),
+                    'status'           => $data['status'],
+                    'lifecycle_status' => $data['lifecycle_status'],
+                    'total_amount'     => floatval($data['total_amount']),
+                    'paid_amount'      => floatval($data['paid_amount']),
+                    'created_at'       => $now,
+                    'sale_date'        => $sale_date,
+                    'sold_date'        => $sold_date,
+                    'author_id'        => intval($data['author_id']),
+                    'general_note'     => $data['general_note'],
+                    'is_rs_uploaded'   => 0
+                ],
+                ['%d', '%s', '%d', '%s', '%s', '%f', '%f', '%s', '%s', '%s', '%d', '%s', '%d']
+            );
+
+            if ($result !== false) {
+                // Success — update post title & postmeta if number changed on retry
+                if ($attempt > 0) {
+                    wp_update_post(['ID' => $post_id, 'post_title' => 'Invoice #' . $invoice_number]);
+                    update_post_meta($post_id, '_cig_invoice_number', $invoice_number);
+                    $data['invoice_number'] = $invoice_number;
+                }
+                break;
+            }
+
+            // Insert failed — check if it's a duplicate key error (error code 1062)
+            if (strpos($wpdb->last_error, 'Duplicate') !== false || strpos($wpdb->last_error, '1062') !== false) {
+                error_log("CIG: Duplicate invoice_number '{$invoice_number}' on attempt " . ($attempt + 1) . ", regenerating...");
+                $invoice_number = CIG_Invoice::get_next_number();
+            } else {
+                // Non-duplicate error — don't retry
+                error_log("CIG: Failed to insert invoice for post {$post_id}: {$wpdb->last_error}");
+                break;
+            }
+        }
 
         // Insert items
         $this->sync_items_to_manager($post_id, $data['items']);
 
         // Insert payments
         $this->sync_payments_to_manager($post_id, $data['payments']);
+
+        return $invoice_number;
     }
 
     /**

@@ -34,8 +34,9 @@ jQuery(function ($) {
       
       if (!editMode) {
           loadFromCart(); // Now loads from DB (cigAjax.initialCart)
+          // Invoice number is auto-assigned by the backend on save — no pre-fetch needed
           if (!$('#invoice-number').val()) {
-              $.post(cigAjax.ajax_url, { action: 'cig_next_invoice_number', nonce: cigAjax.nonce }, function(res){ if(res.success)$('#invoice-number').val(res.data.next); });
+              $('#invoice-number').attr('placeholder', cigAjax.i18n?.auto_number || 'Auto').val('');
           }
       } else {
           prefillEditData();
