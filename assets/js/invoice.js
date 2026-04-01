@@ -391,9 +391,10 @@ jQuery(function ($) {
     });
     $('#grand-total').text(total.toFixed(2));
     if (totalDiscount > 0.01) {
-      $('#cig-discount-summary').text((cigAjax.i18n?.total_discount || 'Discount') + ': ' + totalDiscount.toFixed(2) + ' ₾').show();
+      $('#cig-discount-summary').text(totalDiscount.toFixed(2) + ' ₾');
+      $('#cig-discount-row').show();
     } else {
-      $('#cig-discount-summary').hide();
+      $('#cig-discount-row').hide();
     }
     renderPaymentHistory();
   }

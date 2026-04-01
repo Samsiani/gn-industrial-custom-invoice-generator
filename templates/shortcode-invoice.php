@@ -150,12 +150,15 @@ $current_user = wp_get_current_user();
             <td><?php esc_html_e('Total', 'cig'); ?></td>
             <td id="grand-total">0.00</td>
           </tr>
+          <tr id="cig-discount-row" style="display:none;">
+            <td style="color:#856404;"><?php esc_html_e('Discount', 'cig'); ?></td>
+            <td id="cig-discount-summary" style="color:#856404; font-weight:bold;"></td>
+          </tr>
           <tr>
             <td colspan="2" style="font-size: 12px; text-align: right;"><?php esc_html_e('Price includes VAT', 'cig'); ?></td>
           </tr>
         </tbody>
       </table>
-      <div id="cig-discount-summary" class="cig-discount-summary" style="display:none;"></div>
     </div>
 
     <div class="invoice-payment-section no-print" style="margin-top:20px; padding:0; border:none; background:transparent;">
