@@ -49,23 +49,182 @@ class CIG_Accountant {
         ?>
         <div class="cig-accountant-wrapper">
             <div class="cig-accountant-header">
-                <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
-                    <h2 style="margin:0;"><?php esc_html_e('Accountant Dashboard', 'cig'); ?></h2>
-                    <button type="button" id="cig-acc-stock-btn" style="display:inline-flex; align-items:center; gap:6px; padding:6px 16px; background:#4472C4; color:#fff; border:none; border-radius:4px; font-size:13px; font-weight:600; cursor:pointer;">
-                        <span class="dashicons dashicons-download" style="font-size:16px; width:16px; height:16px;"></span>
+                <style>
+                    .cig-stock-export-row {
+                        display: flex;
+                        align-items: center;
+                        gap: 14px;
+                        flex-wrap: wrap;
+                    }
+                    .cig-stock-export-row h2 { margin: 0; }
+
+                    /* ── Export Button ── */
+                    #cig-acc-stock-btn {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 7px;
+                        padding: 7px 18px;
+                        background: linear-gradient(135deg, #4472C4 0%, #3a5fad 100%);
+                        color: #fff;
+                        border: none;
+                        border-radius: 6px;
+                        font-size: 13px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        box-shadow: 0 2px 6px rgba(68,114,196,.35);
+                        transition: all .2s ease;
+                        line-height: 1;
+                    }
+                    #cig-acc-stock-btn:hover:not(:disabled) {
+                        background: linear-gradient(135deg, #3a5fad 0%, #2e4d8e 100%);
+                        box-shadow: 0 4px 12px rgba(68,114,196,.45);
+                        transform: translateY(-1px);
+                    }
+                    #cig-acc-stock-btn:active:not(:disabled) {
+                        transform: translateY(0);
+                        box-shadow: 0 1px 3px rgba(68,114,196,.3);
+                    }
+                    #cig-acc-stock-btn:disabled {
+                        opacity: .55;
+                        cursor: not-allowed;
+                    }
+                    #cig-acc-stock-btn .dashicons {
+                        font-size: 15px;
+                        width: 15px;
+                        height: 15px;
+                        line-height: 15px;
+                    }
+
+                    /* ── Progress Bar ── */
+                    .cig-stock-progress-wrap {
+                        display: none;
+                        align-items: center;
+                        gap: 10px;
+                        padding: 6px 14px;
+                        background: #f7f9fc;
+                        border: 1px solid #dce3ed;
+                        border-radius: 8px;
+                        min-width: 220px;
+                        max-width: 380px;
+                        flex: 1;
+                    }
+                    .cig-stock-progress-wrap.active { display: flex; }
+                    .cig-stock-progress-info {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 1px;
+                        min-width: 0;
+                        flex: 1;
+                    }
+                    #cig-acc-stock-text {
+                        font-size: 11.5px;
+                        font-weight: 600;
+                        color: #3a5fad;
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                    }
+                    #cig-acc-stock-pct {
+                        font-size: 11px;
+                        color: #8a94a6;
+                        font-variant-numeric: tabular-nums;
+                    }
+                    .cig-stock-bar-track {
+                        width: 100%;
+                        height: 6px;
+                        background: #e2e7f0;
+                        border-radius: 3px;
+                        overflow: hidden;
+                        margin-top: 3px;
+                    }
+                    #cig-acc-stock-bar {
+                        height: 100%;
+                        width: 0;
+                        border-radius: 3px;
+                        background: linear-gradient(90deg, #4472C4, #5b8de6);
+                        transition: width .35s ease;
+                    }
+                    #cig-acc-stock-bar.done {
+                        background: linear-gradient(90deg, #28a745, #34d058);
+                    }
+                    #cig-acc-stock-bar.error {
+                        background: linear-gradient(90deg, #d63638, #e25456);
+                    }
+
+                    /* ── Spinner inside progress ── */
+                    .cig-stock-spinner {
+                        width: 20px;
+                        height: 20px;
+                        border: 2.5px solid #dce3ed;
+                        border-top-color: #4472C4;
+                        border-radius: 50%;
+                        animation: cig-spin .7s linear infinite;
+                        flex-shrink: 0;
+                    }
+                    .cig-stock-spinner.done {
+                        border-color: #28a745;
+                        border-top-color: transparent;
+                        animation: none;
+                    }
+                    @keyframes cig-spin { to { transform: rotate(360deg); } }
+
+                    /* ── Download Button ── */
+                    #cig-acc-stock-download {
+                        display: none;
+                        align-items: center;
+                        gap: 7px;
+                        padding: 7px 18px;
+                        background: linear-gradient(135deg, #28a745 0%, #22913c 100%);
+                        color: #fff;
+                        border: none;
+                        border-radius: 6px;
+                        font-size: 13px;
+                        font-weight: 600;
+                        text-decoration: none;
+                        box-shadow: 0 2px 6px rgba(40,167,69,.35);
+                        transition: all .25s ease;
+                        line-height: 1;
+                        animation: cig-pop-in .35s cubic-bezier(.34,1.56,.64,1);
+                    }
+                    #cig-acc-stock-download:hover {
+                        background: linear-gradient(135deg, #22913c 0%, #1b7a32 100%);
+                        box-shadow: 0 4px 14px rgba(40,167,69,.45);
+                        transform: translateY(-1px);
+                        color: #fff;
+                    }
+                    #cig-acc-stock-download .dashicons {
+                        font-size: 16px;
+                        width: 16px;
+                        height: 16px;
+                        line-height: 16px;
+                    }
+                    @keyframes cig-pop-in {
+                        0% { opacity:0; transform: scale(.8); }
+                        100% { opacity:1; transform: scale(1); }
+                    }
+                </style>
+
+                <div class="cig-stock-export-row">
+                    <h2><?php esc_html_e('Accountant Dashboard', 'cig'); ?></h2>
+
+                    <button type="button" id="cig-acc-stock-btn">
+                        <span class="dashicons dashicons-download"></span>
                         <?php esc_html_e('Export Stock', 'cig'); ?>
                     </button>
-                    <div id="cig-acc-stock-progress" style="display:none; flex:1; min-width:200px; max-width:400px;">
-                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:3px;">
-                            <span id="cig-acc-stock-text" style="font-size:12px; font-weight:600; color:#333;">Starting...</span>
-                            <span id="cig-acc-stock-pct" style="font-size:12px; color:#666;"></span>
-                        </div>
-                        <div style="background:#e0e0e0; border-radius:4px; height:18px; overflow:hidden;">
-                            <div id="cig-acc-stock-bar" style="background:#4472C4; height:100%; width:0; border-radius:4px; transition:width 0.3s;"></div>
+
+                    <div class="cig-stock-progress-wrap" id="cig-acc-stock-progress">
+                        <div class="cig-stock-spinner" id="cig-acc-stock-spinner"></div>
+                        <div class="cig-stock-progress-info">
+                            <span id="cig-acc-stock-text">Starting...</span>
+                            <span id="cig-acc-stock-pct"></span>
+                            <div class="cig-stock-bar-track">
+                                <div id="cig-acc-stock-bar"></div>
+                            </div>
                         </div>
                     </div>
-                    <a id="cig-acc-stock-download" href="#" style="display:none; align-items:center; gap:6px; padding:6px 14px; background:#28a745; color:#fff; border-radius:4px; font-size:13px; font-weight:600; text-decoration:none;">
-                        <span class="dashicons dashicons-media-spreadsheet" style="font-size:18px; width:18px; height:18px;"></span>
+
+                    <a id="cig-acc-stock-download" href="#">
+                        <span class="dashicons dashicons-media-spreadsheet"></span>
                         <?php esc_html_e('Download XLSX', 'cig'); ?>
                     </a>
                 </div>
@@ -213,6 +372,7 @@ class CIG_Accountant {
         (function(){
             var btn      = document.getElementById('cig-acc-stock-btn');
             var progress = document.getElementById('cig-acc-stock-progress');
+            var spinner  = document.getElementById('cig-acc-stock-spinner');
             var bar      = document.getElementById('cig-acc-stock-bar');
             var txt      = document.getElementById('cig-acc-stock-text');
             var pct      = document.getElementById('cig-acc-stock-pct');
@@ -222,12 +382,12 @@ class CIG_Accountant {
 
             btn.addEventListener('click', function(){
                 btn.disabled = true;
-                btn.style.opacity = '0.6';
                 dlLink.style.display = 'none';
-                progress.style.display = 'flex';
+                progress.classList.add('active');
+                spinner.className = 'cig-stock-spinner';
+                bar.className = '';
                 bar.style.width = '0';
-                bar.style.background = '#4472C4';
-                txt.textContent = 'Counting products...';
+                txt.textContent = 'Counting products\u2026';
                 pct.textContent = '';
 
                 post('cig_acc_stock_start', {}, function(data){
@@ -238,7 +398,7 @@ class CIG_Accountant {
                     var total = data.data.total;
                     var batch = data.data.batch;
                     var processed = 0;
-                    txt.textContent = 'Exporting...';
+                    txt.textContent = 'Exporting\u2026';
                     pct.textContent = '0 / ' + total;
 
                     function nextBatch(){
@@ -251,20 +411,20 @@ class CIG_Accountant {
                             var prog = Math.min(processed, total);
                             var percent = Math.round((prog / total) * 100);
                             bar.style.width = percent + '%';
-                            pct.textContent = prog + ' / ' + total;
+                            pct.textContent = prog + ' / ' + total + '  (' + percent + '%)';
 
                             if(data.data.done){
                                 bar.style.width = '100%';
-                                bar.style.background = '#28a745';
-                                txt.textContent = 'Done!';
-                                pct.textContent = total + ' / ' + total;
+                                bar.classList.add('done');
+                                spinner.classList.add('done');
+                                txt.textContent = 'Export complete';
+                                pct.textContent = total + ' products';
                                 btn.disabled = false;
-                                btn.style.opacity = '1';
 
                                 dlLink.href = data.data.download_url;
                                 dlLink.style.display = 'inline-flex';
 
-                                setTimeout(function(){ progress.style.display = 'none'; }, 1500);
+                                setTimeout(function(){ progress.classList.remove('active'); }, 2000);
                             } else {
                                 nextBatch();
                             }
@@ -276,11 +436,17 @@ class CIG_Accountant {
 
             function showError(msg){
                 bar.style.width = '100%';
-                bar.style.background = '#d63638';
-                txt.textContent = 'Error: ' + msg;
+                bar.classList.add('error');
+                spinner.classList.add('done');
+                txt.textContent = msg;
+                txt.style.color = '#d63638';
                 pct.textContent = '';
                 btn.disabled = false;
-                btn.style.opacity = '1';
+                setTimeout(function(){
+                    txt.style.color = '';
+                    progress.classList.remove('active');
+                    bar.classList.remove('error');
+                }, 4000);
             }
 
             function post(action, params, cb){
