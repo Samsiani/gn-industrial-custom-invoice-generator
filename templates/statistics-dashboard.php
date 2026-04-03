@@ -545,7 +545,7 @@ if (!defined('ABSPATH')) {
         </div>
 
         <!-- Product Sold Summary -->
-        <div class="cig-stats-summary" id="cig-product-sold-summary" style="grid-template-columns: repeat(2, 1fr); display:none;">
+        <div class="cig-stats-summary" id="cig-product-sold-summary" style="grid-template-columns: repeat(3, 1fr); display:none;">
             <div class="cig-stat-card">
                 <div class="cig-stat-icon" style="background:#28a745;">
                     <span class="dashicons dashicons-chart-bar"></span>
@@ -562,6 +562,15 @@ if (!defined('ABSPATH')) {
                 <div class="cig-stat-content">
                     <div class="cig-stat-label"><?php esc_html_e('Unique Products', 'cig'); ?></div>
                     <div class="cig-stat-value" id="cig-pp-unique-products">0</div>
+                </div>
+            </div>
+            <div class="cig-stat-card">
+                <div class="cig-stat-icon" style="background:#e67e22;">
+                    <span class="dashicons dashicons-money-alt"></span>
+                </div>
+                <div class="cig-stat-content">
+                    <div class="cig-stat-label"><?php esc_html_e('Total Income', 'cig'); ?></div>
+                    <div class="cig-stat-value" id="cig-pp-total-income">0 ₾</div>
                 </div>
             </div>
         </div>

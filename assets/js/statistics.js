@@ -797,6 +797,7 @@ jQuery(function ($) {
                   if (res.data.totals) {
                       $('#cig-pp-total-units').text(formatNumber(res.data.totals.total_units_sold));
                       $('#cig-pp-unique-products').text(formatNumber(res.data.totals.unique_products));
+                      $('#cig-pp-total-income').text(formatNumber(res.data.totals.total_income) + ' ₾');
                       $('#cig-product-sold-summary').show();
                   }
               } else {

@@ -1365,7 +1365,12 @@ class CIG_Ajax_Statistics {
                 WHEN inv.status = 'standard' AND it.item_status IN ('sold','reserved')";
         if ($date_from) $totals_sql .= " AND inv.sale_date >= %s";
         if ($date_to) $totals_sql .= " AND inv.sale_date <= %s";
-        $totals_sql .= " THEN it.quantity ELSE 0 END), 0) as total_units_sold
+        $totals_sql .= " THEN it.quantity ELSE 0 END), 0) as total_units_sold,
+            COALESCE(SUM(CASE
+                WHEN inv.status = 'standard' AND it.item_status IN ('sold','reserved')";
+        if ($date_from) $totals_sql .= " AND inv.sale_date >= %s";
+        if ($date_to) $totals_sql .= " AND inv.sale_date <= %s";
+        $totals_sql .= " THEN it.total ELSE 0 END), 0) as total_income
             FROM {$this->table_items} it
             INNER JOIN {$this->table_invoices} inv ON it.invoice_id = inv.id
             WHERE " . ($search ? "(it.product_name LIKE %s OR it.sku LIKE %s)" : "1=1");
@@ -1375,6 +1380,9 @@ class CIG_Ajax_Statistics {
         if ($date_from) $totals_params[] = $date_from_full;
         if ($date_to) $totals_params[] = $date_to_full;
         // total_units_sold date params
+        if ($date_from) $totals_params[] = $date_from_full;
+        if ($date_to) $totals_params[] = $date_to_full;
+        // total_income date params
         if ($date_from) $totals_params[] = $date_from_full;
         if ($date_to) $totals_params[] = $date_to_full;
         if ($search) {
@@ -1389,6 +1397,7 @@ class CIG_Ajax_Statistics {
         );
         $total_units_sold = (int)($totals_row['total_units_sold'] ?? 0);
         $unique_products  = (int)($totals_row['unique_products'] ?? 0);
+        $total_income     = (float)($totals_row['total_income'] ?? 0);
 
         // Process results and get current stock info
         $products = [];
@@ -1434,6 +1443,7 @@ class CIG_Ajax_Statistics {
             'totals' => [
                 'total_units_sold' => $total_units_sold,
                 'unique_products'  => $unique_products,
+                'total_income'     => $total_income,
             ]
         ]);
     }
