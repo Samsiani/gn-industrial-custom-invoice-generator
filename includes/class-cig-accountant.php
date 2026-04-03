@@ -20,6 +20,11 @@ class CIG_Accountant {
         $this->invoice_manager = CIG_Invoice_Manager::instance();
         add_action('admin_menu', [$this, 'register_menu']);
         add_shortcode('invoice_accountant_dashboard', [$this, 'render_shortcode']);
+
+        // Stock export AJAX (accountant-only, separate from backup plugin)
+        add_action('wp_ajax_cig_acc_stock_start', [$this, 'ajax_stock_start']);
+        add_action('wp_ajax_cig_acc_stock_batch', [$this, 'ajax_stock_batch']);
+        add_action('wp_ajax_cig_acc_stock_download', [$this, 'ajax_stock_download']);
     }
 
     public function register_menu() {
@@ -44,7 +49,26 @@ class CIG_Accountant {
         ?>
         <div class="cig-accountant-wrapper">
             <div class="cig-accountant-header">
-                <h2><?php esc_html_e('Accountant Dashboard', 'cig'); ?></h2>
+                <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
+                    <h2 style="margin:0;"><?php esc_html_e('Accountant Dashboard', 'cig'); ?></h2>
+                    <button type="button" id="cig-acc-stock-btn" style="display:inline-flex; align-items:center; gap:6px; padding:6px 16px; background:#4472C4; color:#fff; border:none; border-radius:4px; font-size:13px; font-weight:600; cursor:pointer;">
+                        <span class="dashicons dashicons-download" style="font-size:16px; width:16px; height:16px;"></span>
+                        <?php esc_html_e('Export Stock', 'cig'); ?>
+                    </button>
+                    <div id="cig-acc-stock-progress" style="display:none; flex:1; min-width:200px; max-width:400px;">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:3px;">
+                            <span id="cig-acc-stock-text" style="font-size:12px; font-weight:600; color:#333;">Starting...</span>
+                            <span id="cig-acc-stock-pct" style="font-size:12px; color:#666;"></span>
+                        </div>
+                        <div style="background:#e0e0e0; border-radius:4px; height:18px; overflow:hidden;">
+                            <div id="cig-acc-stock-bar" style="background:#4472C4; height:100%; width:0; border-radius:4px; transition:width 0.3s;"></div>
+                        </div>
+                    </div>
+                    <a id="cig-acc-stock-download" href="#" style="display:none; align-items:center; gap:6px; padding:6px 14px; background:#28a745; color:#fff; border-radius:4px; font-size:13px; font-weight:600; text-decoration:none;">
+                        <span class="dashicons dashicons-media-spreadsheet" style="font-size:18px; width:18px; height:18px;"></span>
+                        <?php esc_html_e('Download XLSX', 'cig'); ?>
+                    </a>
+                </div>
                 
                 <div class="cig-acc-filters-section">
                     
@@ -185,6 +209,92 @@ class CIG_Accountant {
             </div>
         </div>
 
+        <script>
+        (function(){
+            var btn      = document.getElementById('cig-acc-stock-btn');
+            var progress = document.getElementById('cig-acc-stock-progress');
+            var bar      = document.getElementById('cig-acc-stock-bar');
+            var txt      = document.getElementById('cig-acc-stock-text');
+            var pct      = document.getElementById('cig-acc-stock-pct');
+            var dlLink   = document.getElementById('cig-acc-stock-download');
+            var ajaxUrl  = '<?php echo esc_js(admin_url("admin-ajax.php")); ?>';
+            var nonce    = '<?php echo esc_js(wp_create_nonce("cig_acc_stock")); ?>';
+
+            btn.addEventListener('click', function(){
+                btn.disabled = true;
+                btn.style.opacity = '0.6';
+                dlLink.style.display = 'none';
+                progress.style.display = 'flex';
+                bar.style.width = '0';
+                bar.style.background = '#4472C4';
+                txt.textContent = 'Counting products...';
+                pct.textContent = '';
+
+                post('cig_acc_stock_start', {}, function(data){
+                    if(!data.success){
+                        showError(data.data || 'Failed to start.');
+                        return;
+                    }
+                    var total = data.data.total;
+                    var batch = data.data.batch;
+                    var processed = 0;
+                    txt.textContent = 'Exporting...';
+                    pct.textContent = '0 / ' + total;
+
+                    function nextBatch(){
+                        post('cig_acc_stock_batch', {offset: processed}, function(data){
+                            if(!data.success){
+                                showError(data.data || 'Batch failed.');
+                                return;
+                            }
+                            processed += batch;
+                            var prog = Math.min(processed, total);
+                            var percent = Math.round((prog / total) * 100);
+                            bar.style.width = percent + '%';
+                            pct.textContent = prog + ' / ' + total;
+
+                            if(data.data.done){
+                                bar.style.width = '100%';
+                                bar.style.background = '#28a745';
+                                txt.textContent = 'Done!';
+                                pct.textContent = total + ' / ' + total;
+                                btn.disabled = false;
+                                btn.style.opacity = '1';
+
+                                dlLink.href = data.data.download_url;
+                                dlLink.style.display = 'inline-flex';
+
+                                setTimeout(function(){ progress.style.display = 'none'; }, 1500);
+                            } else {
+                                nextBatch();
+                            }
+                        });
+                    }
+                    nextBatch();
+                });
+            });
+
+            function showError(msg){
+                bar.style.width = '100%';
+                bar.style.background = '#d63638';
+                txt.textContent = 'Error: ' + msg;
+                pct.textContent = '';
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            }
+
+            function post(action, params, cb){
+                var fd = new FormData();
+                fd.append('action', action);
+                fd.append('nonce', nonce);
+                for(var k in params) fd.append(k, params[k]);
+                fetch(ajaxUrl, {method:'POST', body:fd, credentials:'same-origin'})
+                    .then(function(r){ return r.json(); })
+                    .then(cb)
+                    .catch(function(e){ showError(e.message); });
+            }
+        })();
+        </script>
         <?php
         return ob_get_clean();
     }
@@ -352,5 +462,126 @@ class CIG_Accountant {
             </table>
         </div>
         <?php
+    }
+
+    // ── Stock Export (Accountant) ──────────────────────────────────────────
+
+    private function ensure_export_dir() {
+        $dir = wp_upload_dir()['basedir'] . '/cig_exports/';
+        if ( ! file_exists( $dir ) ) {
+            wp_mkdir_p( $dir );
+        }
+        if ( ! file_exists( $dir . '.htaccess' ) ) {
+            file_put_contents( $dir . '.htaccess', "Order deny,allow\nDeny from all\n" );
+        }
+        if ( ! file_exists( $dir . 'index.php' ) ) {
+            file_put_contents( $dir . 'index.php', '<?php // Silence is golden.' );
+        }
+        return $dir;
+    }
+
+    public function ajax_stock_start() {
+        check_ajax_referer( 'cig_acc_stock', 'nonce' );
+        if ( ! current_user_can( 'read' ) ) {
+            wp_send_json_error( 'Unauthorized.', 403 );
+        }
+        if ( ! function_exists( 'wcis_get_product_count' ) || ! class_exists( 'WCIS_XLSX_Writer' ) ) {
+            wp_send_json_error( 'Stock snapshot plugin is not active.' );
+        }
+
+        global $wpdb;
+        $total = wcis_get_product_count( $wpdb );
+        if ( ! $total ) {
+            wp_send_json_error( 'No products found.' );
+        }
+
+        $filename = 'stock-' . wp_date( 'd-F-Y_H-i' ) . '.xlsx';
+        $xlsx     = new WCIS_XLSX_Writer();
+        $xlsx->add_row( array( 'ID', 'SKU', 'Name', 'Stock', 'Reserved', 'Available', 'Price' ) );
+
+        set_transient( 'cig_acc_export_file', $filename, 600 );
+        set_transient( 'cig_acc_export_xlsx', $xlsx, 600 );
+
+        wp_send_json_success( array(
+            'total' => $total,
+            'batch' => defined( 'WCIS_BATCH_SIZE' ) ? WCIS_BATCH_SIZE : 200,
+        ) );
+    }
+
+    public function ajax_stock_batch() {
+        check_ajax_referer( 'cig_acc_stock', 'nonce' );
+        if ( ! current_user_can( 'read' ) ) {
+            wp_send_json_error( 'Unauthorized.', 403 );
+        }
+
+        $offset   = isset( $_POST['offset'] ) ? absint( $_POST['offset'] ) : 0;
+        $filename = get_transient( 'cig_acc_export_file' );
+        $xlsx     = get_transient( 'cig_acc_export_xlsx' );
+
+        if ( ! $filename || ! $xlsx || ! ( $xlsx instanceof WCIS_XLSX_Writer ) ) {
+            wp_send_json_error( 'Export session expired. Please try again.' );
+        }
+
+        global $wpdb;
+        $batch_size = defined( 'WCIS_BATCH_SIZE' ) ? WCIS_BATCH_SIZE : 200;
+        $rows       = wcis_fetch_batch( $wpdb, $offset, $batch_size );
+
+        $written = 0;
+        if ( ! empty( $rows ) ) {
+            $written = wcis_write_rows( $wpdb, $xlsx, $rows );
+        }
+
+        $done = ( count( $rows ) < $batch_size );
+
+        if ( $done ) {
+            $dir = $this->ensure_export_dir();
+
+            // Remove previous accountant exports.
+            $old = glob( $dir . 'stock-*.xlsx' );
+            if ( $old ) {
+                foreach ( $old as $f ) {
+                    @unlink( $f );
+                }
+            }
+
+            $xlsx->save( $dir . sanitize_file_name( $filename ) );
+
+            delete_transient( 'cig_acc_export_file' );
+            delete_transient( 'cig_acc_export_xlsx' );
+
+            wp_send_json_success( array(
+                'written'      => $written,
+                'done'         => true,
+                'download_url' => admin_url( 'admin-ajax.php?action=cig_acc_stock_download&file=' . urlencode( $filename ) . '&nonce=' . wp_create_nonce( 'cig_acc_dl' ) ),
+            ) );
+        } else {
+            set_transient( 'cig_acc_export_xlsx', $xlsx, 600 );
+            wp_send_json_success( array(
+                'written' => $written,
+                'done'    => false,
+            ) );
+        }
+    }
+
+    public function ajax_stock_download() {
+        if ( ! isset( $_GET['nonce'] ) || ! wp_verify_nonce( $_GET['nonce'], 'cig_acc_dl' ) ) {
+            wp_die( 'Invalid request.' );
+        }
+        if ( ! current_user_can( 'read' ) ) {
+            wp_die( 'Unauthorized.' );
+        }
+
+        $file = sanitize_file_name( $_GET['file'] ?? '' );
+        $path = wp_upload_dir()['basedir'] . '/cig_exports/' . $file;
+
+        if ( ! $file || ! file_exists( $path ) ) {
+            wp_die( 'File not found.' );
+        }
+
+        header( 'Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' );
+        header( 'Content-Disposition: attachment; filename="' . $file . '"' );
+        header( 'Content-Length: ' . filesize( $path ) );
+        readfile( $path );
+        exit;
     }
 }
