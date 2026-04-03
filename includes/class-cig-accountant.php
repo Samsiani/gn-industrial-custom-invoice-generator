@@ -55,6 +55,7 @@ class CIG_Accountant {
                         align-items: center;
                         gap: 14px;
                         flex-wrap: wrap;
+                        margin-bottom: 14px;
                     }
                     .cig-stock-export-row h2 { margin: 0; }
 
@@ -663,7 +664,7 @@ class CIG_Accountant {
 
         $filename = 'stock-' . wp_date( 'd-F-Y_H-i' ) . '.xlsx';
         $xlsx     = new WCIS_XLSX_Writer();
-        $xlsx->add_row( array( 'ID', 'SKU', 'Name', 'Stock', 'Reserved', 'Available', 'Price' ) );
+        $xlsx->add_row( array( 'ID', 'SKU', 'Name', 'Stock', 'Reserved', 'Available', 'Price', 'Upload Date' ) );
 
         set_transient( 'cig_acc_export_file', $filename, 600 );
         set_transient( 'cig_acc_export_xlsx', $xlsx, 600 );
@@ -690,11 +691,11 @@ class CIG_Accountant {
 
         global $wpdb;
         $batch_size = defined( 'WCIS_BATCH_SIZE' ) ? WCIS_BATCH_SIZE : 200;
-        $rows       = wcis_fetch_batch( $wpdb, $offset, $batch_size );
+        $rows       = $this->fetch_batch_with_date( $wpdb, $offset, $batch_size );
 
         $written = 0;
         if ( ! empty( $rows ) ) {
-            $written = wcis_write_rows( $wpdb, $xlsx, $rows );
+            $written = $this->write_rows_with_date( $wpdb, $xlsx, $rows );
         }
 
         $done = ( count( $rows ) < $batch_size );
@@ -749,5 +750,136 @@ class CIG_Accountant {
         header( 'Content-Length: ' . filesize( $path ) );
         readfile( $path );
         exit;
+    }
+
+    /**
+     * Fetch batch with post_date included (accountant-only query).
+     */
+    private function fetch_batch_with_date( $wpdb, $offset, $limit ) {
+        $lang = defined( 'WCIS_LANG' ) ? WCIS_LANG : 'ka-ge';
+        return $wpdb->get_results( $wpdb->prepare(
+            "SELECT
+                p.ID,
+                p.post_title AS name,
+                p.post_type,
+                p.post_parent,
+                p.post_date,
+                MAX(CASE WHEN pm.meta_key = '_sku'   THEN pm.meta_value END) AS sku,
+                COALESCE(CAST(MAX(CASE WHEN pm.meta_key = '_stock' THEN pm.meta_value END) AS SIGNED), 0) AS stock,
+                MAX(CASE WHEN pm.meta_key = '_price'  THEN pm.meta_value END) AS price
+            FROM {$wpdb->posts} p
+            INNER JOIN {$wpdb->prefix}icl_translations t
+                ON t.element_id = p.ID
+                AND t.element_type = CONCAT('post_', p.post_type)
+                AND t.language_code = %s
+            LEFT JOIN {$wpdb->postmeta} pm
+                ON pm.post_id = p.ID
+                AND pm.meta_key IN ('_sku', '_stock', '_price')
+            WHERE p.post_type IN ('product', 'product_variation')
+              AND p.post_status = 'publish'
+            GROUP BY p.ID
+            ORDER BY
+                CASE WHEN COALESCE(CAST(MAX(CASE WHEN pm.meta_key = '_stock' THEN pm.meta_value END) AS SIGNED), 0) > 0 THEN 0 ELSE 1 END,
+                COALESCE(CAST(MAX(CASE WHEN pm.meta_key = '_stock' THEN pm.meta_value END) AS SIGNED), 0) DESC
+            LIMIT %d OFFSET %d",
+            $lang,
+            $limit,
+            $offset
+        ) );
+    }
+
+    /**
+     * Write rows with Upload Date column (accountant-only).
+     */
+    private function write_rows_with_date( $wpdb, $xlsx, $rows ) {
+        $all_ids       = array();
+        $variation_ids = array();
+        $parent_ids    = array();
+
+        foreach ( $rows as $row ) {
+            $all_ids[] = (int) $row->ID;
+            if ( $row->post_type === 'product_variation' ) {
+                $variation_ids[] = (int) $row->ID;
+                $parent_ids[ $row->post_parent ] = true;
+            }
+        }
+
+        // Batch-fetch reserved stock.
+        $reserved_map = array();
+        if ( $all_ids ) {
+            $placeholders  = implode( ',', array_fill( 0, count( $all_ids ), '%d' ) );
+            $reserved_rows = $wpdb->get_results( $wpdb->prepare(
+                "SELECT post_id, meta_value
+                 FROM {$wpdb->postmeta}
+                 WHERE post_id IN ({$placeholders})
+                   AND meta_key = '_cig_reserved_stock'",
+                ...$all_ids
+            ) );
+            foreach ( $reserved_rows as $rr ) {
+                $data = maybe_unserialize( $rr->meta_value );
+                $qty  = 0;
+                if ( is_array( $data ) ) {
+                    foreach ( $data as $entry ) {
+                        if ( isset( $entry['qty'] ) ) {
+                            $qty += (float) $entry['qty'];
+                        }
+                    }
+                }
+                $reserved_map[ $rr->post_id ] = (int) $qty;
+            }
+        }
+
+        // Batch-fetch variation attributes.
+        $variation_attrs = array();
+        if ( $variation_ids ) {
+            $placeholders = implode( ',', array_fill( 0, count( $variation_ids ), '%d' ) );
+            $attr_rows    = $wpdb->get_results( $wpdb->prepare(
+                "SELECT post_id, meta_value
+                 FROM {$wpdb->postmeta}
+                 WHERE post_id IN ({$placeholders})
+                   AND meta_key LIKE 'attribute_%%'
+                   AND meta_value != ''",
+                ...$variation_ids
+            ) );
+            foreach ( $attr_rows as $ar ) {
+                $variation_attrs[ $ar->post_id ][] = urldecode( $ar->meta_value );
+            }
+        }
+
+        $count = 0;
+        foreach ( $rows as $row ) {
+            if ( $row->post_type === 'product' && isset( $parent_ids[ $row->ID ] ) ) {
+                continue;
+            }
+
+            $sku = $row->sku ?: '';
+            if ( $sku && stripos( $sku, 'GN20ST' ) === 0 ) {
+                continue;
+            }
+
+            $stock    = (int) $row->stock;
+            $reserved = isset( $reserved_map[ $row->ID ] ) ? $reserved_map[ $row->ID ] : 0;
+            $name     = $row->name;
+
+            if ( $row->post_type === 'product_variation' && isset( $variation_attrs[ $row->ID ] ) ) {
+                $name .= ' — ' . implode( ', ', $variation_attrs[ $row->ID ] );
+            }
+
+            $upload_date = $row->post_date ? date( 'Y-m-d', strtotime( $row->post_date ) ) : '';
+
+            $xlsx->add_row( array(
+                (int) $row->ID,
+                $sku,
+                $name,
+                $stock,
+                $reserved,
+                $stock - $reserved,
+                ( $row->price ? $row->price . ' ₾' : '0 ₾' ),
+                $upload_date,
+            ) );
+            $count++;
+        }
+
+        return $count;
     }
 }
