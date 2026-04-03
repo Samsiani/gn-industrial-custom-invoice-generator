@@ -778,9 +778,7 @@ class CIG_Accountant {
             WHERE p.post_type IN ('product', 'product_variation')
               AND p.post_status = 'publish'
             GROUP BY p.ID
-            ORDER BY
-                CASE WHEN COALESCE(CAST(MAX(CASE WHEN pm.meta_key = '_stock' THEN pm.meta_value END) AS SIGNED), 0) > 0 THEN 0 ELSE 1 END,
-                COALESCE(CAST(MAX(CASE WHEN pm.meta_key = '_stock' THEN pm.meta_value END) AS SIGNED), 0) DESC
+            ORDER BY p.post_date ASC
             LIMIT %d OFFSET %d",
             $lang,
             $limit,
