@@ -1327,18 +1327,22 @@ jQuery(function ($) {
   function clearSummaryDropdowns() { $('#cig-summary-invoices').hide(); $('#cig-summary-outstanding').hide(); $('#cig-summary-products').hide(); }
 
   // --- TOGGLE INVOICES DROPDOWN ---
-  function toggleInvoicesDropdown(method, titleText) {
+  var invoicesDropdownPage = 1;
+
+  function toggleInvoicesDropdown(method, titleText, page) {
     var $panel = $('#cig-summary-invoices');
-    if ($panel.is(':visible') && $panel.data('method') === method) { 
-        $panel.slideUp(150); 
-        return; 
+    if (!page && $panel.is(':visible') && $panel.data('method') === method) {
+        $panel.slideUp(150);
+        return;
     }
-    
+
+    invoicesDropdownPage = page || 1;
     $panel.data('method', method);
-    
+
     $('#cig-summary-products').hide(); $('#cig-summary-outstanding').hide();
     $('#cig-summary-invoices-tbody').html('<tr class="loading-row"><td colspan="9"><div class="cig-loading-spinner"><div class="spinner"></div><p>' + (cigStats.i18n?.loading || 'Loading...') + '</p></div></td></tr>');
-    
+    $('#cig-invoices-pagination').remove();
+
     if(titleText) {
         $('#cig-summary-title').html('<strong>' + escapeHtml(titleText) + '</strong>');
     } else {
@@ -1346,17 +1350,18 @@ jQuery(function ($) {
     }
 
     $panel.slideDown(150);
-    
+
     $.ajax({
       url: cigStats.ajax_url, method: 'POST', dataType: 'json',
-      data: { 
-          action: 'cig_get_invoices_by_filters', 
-          nonce: cigStats.nonce, 
-          date_from: currentFilters.date_from, 
-          date_to: currentFilters.date_to, 
-          payment_method: method, // Pass specific method from card
-          status: 'standard',  // General Overview tab ALWAYS uses 'standard' (Active invoices only)
-          search: currentFilters.search
+      data: {
+          action: 'cig_get_invoices_by_filters',
+          nonce: cigStats.nonce,
+          date_from: currentFilters.date_from,
+          date_to: currentFilters.date_to,
+          payment_method: method,
+          status: 'standard',
+          search: currentFilters.search,
+          page: invoicesDropdownPage
       },
       success: function(res) {
         if (res && res.success && res.data && res.data.invoices && res.data.invoices.length) {
@@ -1397,11 +1402,52 @@ jQuery(function ($) {
             html += '</tr>';
           });
           $('#cig-summary-invoices-tbody').html(html);
+
+          // Render pagination if available
+          if (res.data.pagination && res.data.pagination.total_pages > 1) {
+            var pg = res.data.pagination;
+            var pgHtml = '<div id="cig-invoices-pagination" style="display:flex; align-items:center; justify-content:center; gap:6px; padding:12px 0; flex-wrap:wrap;">';
+            pgHtml += '<span style="color:#666; font-size:12px; margin-right:8px;">Page ' + pg.current_page + ' / ' + pg.total_pages + ' (' + pg.total_count + ' invoices)</span>';
+
+            if (pg.current_page > 1) {
+              pgHtml += '<button class="cig-inv-page-btn" data-page="' + (pg.current_page - 1) + '" data-method="' + escapeHtml(method) + '" style="padding:4px 10px; border:1px solid #ccc; border-radius:4px; background:#fff; cursor:pointer; font-size:12px;">&laquo; Prev</button>';
+            }
+
+            var startPage = Math.max(1, pg.current_page - 3);
+            var endPage = Math.min(pg.total_pages, pg.current_page + 3);
+            if (startPage > 1) {
+              pgHtml += '<button class="cig-inv-page-btn" data-page="1" data-method="' + escapeHtml(method) + '" style="padding:4px 8px; border:1px solid #ccc; border-radius:4px; background:#fff; cursor:pointer; font-size:12px;">1</button>';
+              if (startPage > 2) pgHtml += '<span style="color:#999;">...</span>';
+            }
+            for (var p = startPage; p <= endPage; p++) {
+              var activeStyle = (p === pg.current_page) ? 'background:#50529d; color:#fff; border-color:#50529d;' : 'background:#fff; cursor:pointer;';
+              pgHtml += '<button class="cig-inv-page-btn" data-page="' + p + '" data-method="' + escapeHtml(method) + '" style="padding:4px 8px; border:1px solid #ccc; border-radius:4px; font-size:12px; ' + activeStyle + '">' + p + '</button>';
+            }
+            if (endPage < pg.total_pages) {
+              if (endPage < pg.total_pages - 1) pgHtml += '<span style="color:#999;">...</span>';
+              pgHtml += '<button class="cig-inv-page-btn" data-page="' + pg.total_pages + '" data-method="' + escapeHtml(method) + '" style="padding:4px 8px; border:1px solid #ccc; border-radius:4px; background:#fff; cursor:pointer; font-size:12px;">' + pg.total_pages + '</button>';
+            }
+
+            if (pg.current_page < pg.total_pages) {
+              pgHtml += '<button class="cig-inv-page-btn" data-page="' + (pg.current_page + 1) + '" data-method="' + escapeHtml(method) + '" style="padding:4px 10px; border:1px solid #ccc; border-radius:4px; background:#fff; cursor:pointer; font-size:12px;">Next &raquo;</button>';
+            }
+            pgHtml += '</div>';
+            $('#cig-summary-invoices table').after(pgHtml);
+          }
         } else { $('#cig-summary-invoices-tbody').html('<tr class="no-results-row"><td colspan="9">' + (cigStats.i18n?.no_invoices_found || 'No invoices found') + '</td></tr>'); }
       },
       error: function() { $('#cig-summary-invoices-tbody').html('<tr class="no-results-row"><td colspan="9" style="color:#dc3545;">' + (cigStats.i18n?.error_loading_invoices || 'Error loading invoices') + '</td></tr>'); }
     });
   }
+
+  // Pagination click handler for invoices dropdown
+  $(document).on('click', '.cig-inv-page-btn', function() {
+    var pg = $(this).data('page');
+    var method = $(this).data('method');
+    if (pg) {
+      toggleInvoicesDropdown(method, null, pg);
+    }
+  });
 
   // --- TOGGLE OUTSTANDING DROPDOWN ---
   function toggleOutstandingDropdown(titleText) {

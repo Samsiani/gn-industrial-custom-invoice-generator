@@ -560,12 +560,14 @@ class CIG_Ajax_Statistics {
     public function get_invoices_by_filters() {
         $this->security->verify_ajax_request('cig_nonce', 'nonce', 'edit_posts');
         global $wpdb;
-        
+
         $status = sanitize_text_field($_POST['status'] ?? 'standard');
         $mf = sanitize_text_field($_POST['payment_method'] ?? '');
         $date_from = sanitize_text_field($_POST['date_from'] ?? '');
         $date_to = sanitize_text_field($_POST['date_to'] ?? '');
         $search = sanitize_text_field($_POST['search'] ?? '');
+        $page = max(1, intval($_POST['page'] ?? 1));
+        $per_page = ($mf === 'reserved_invoices') ? 50 : self::MAX_DRILL_DOWN_RESULTS;
 
         // Fallback if tables don't exist - use legacy WP_Query method
         if (!$this->tables_exist()) {
@@ -668,8 +670,30 @@ class CIG_Ajax_Statistics {
                 $params[] = $date_to . ' 23:59:59'; 
             }
 
+            // For reserved_invoices: filter at SQL level with JOIN on items table
+            if ($mf === 'reserved_invoices') {
+                $where .= " AND EXISTS (
+                    SELECT 1 FROM {$this->table_items} ri
+                    WHERE ri.invoice_id = i.id AND ri.item_status = 'reserved'
+                )";
+            }
+
+            // Count total for pagination (reserved_invoices only)
+            $total_count = 0;
+            if ($mf === 'reserved_invoices') {
+                $count_sql = "SELECT COUNT(DISTINCT i.id)
+                    FROM {$this->table_invoices} i
+                    LEFT JOIN {$this->table_customers} c ON i.customer_id = c.id
+                    {$where}";
+                $total_count = (int) $wpdb->get_var(
+                    !empty($params) ? $wpdb->prepare($count_sql, $params) : $count_sql
+                );
+            }
+
+            $offset = ($page - 1) * $per_page;
+
             // Main query: Join with customers for names
-            $sql = "SELECT 
+            $sql = "SELECT
                 i.id,
                 i.invoice_number,
                 i.total_amount,
@@ -683,7 +707,7 @@ class CIG_Ajax_Statistics {
                 LEFT JOIN {$this->table_customers} c ON i.customer_id = c.id
                 {$where}
                 ORDER BY {$order_column} DESC
-                LIMIT " . self::MAX_DRILL_DOWN_RESULTS;
+                LIMIT {$per_page} OFFSET {$offset}";
         }
 
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.PreparedSQL.NotPrepared
@@ -696,17 +720,7 @@ class CIG_Ajax_Statistics {
         foreach ($invoices as $inv) {
             $id = intval($inv['id']);
 
-            // Check for reserved items if filtering for reserved_invoices
-            if ($mf === 'reserved_invoices') {
-                // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-                $has_reserved = $wpdb->get_var(
-                    $wpdb->prepare(
-                        "SELECT COUNT(*) FROM {$this->table_items} WHERE invoice_id = %d AND item_status = 'reserved'",
-                        $id
-                    )
-                );
-                if (!$has_reserved) continue;
-            }
+            // Reserved filtering is now handled at SQL level — no PHP-level check needed
 
             // Get payment history from cig_payments
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
@@ -817,7 +831,15 @@ class CIG_Ajax_Statistics {
             ];
         }
 
-        wp_send_json_success(['invoices' => $rows]);
+        $response = ['invoices' => $rows];
+        if ($mf === 'reserved_invoices' && $total_count > 0) {
+            $response['pagination'] = [
+                'current_page' => $page,
+                'total_pages'  => (int) ceil($total_count / $per_page),
+                'total_count'  => $total_count,
+            ];
+        }
+        wp_send_json_success($response);
     }
 
     /**
