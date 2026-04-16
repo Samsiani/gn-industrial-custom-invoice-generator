@@ -3,7 +3,7 @@
  * Plugin Name: Custom WooCommerce Invoice Generator
  * Plugin URI: https://example.com/invoice-generator
  * Description: Professional invoice generator with advanced stock reservation, real-time validation, and comprehensive analytics.
- * Version: 4.9.18
+ * Version: 4.9.19
  * Author: Samsiani
  * Author URI: https://example.com
  * Text Domain: cig
@@ -39,7 +39,7 @@ add_action('before_woocommerce_init', function() {
 /**
  * Plugin constants
  */
-define('CIG_VERSION', '4.9.18');
+define('CIG_VERSION', '4.9.19');
 define('CIG_PLUGIN_FILE', __FILE__);
 define('CIG_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('CIG_PLUGIN_URL', plugin_dir_url(__FILE__));

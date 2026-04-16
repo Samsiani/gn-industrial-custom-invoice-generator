@@ -4,6 +4,14 @@ jQuery(function($) {
     // Safety check
     if (typeof cigStockTable === 'undefined') return;
 
+    document.addEventListener('wheel', function(e) {
+        var t = e.target;
+        if (t && t.classList && t.classList.contains('cig-edit-input') && document.activeElement === t) {
+            e.preventDefault();
+            t.blur();
+        }
+    }, { passive: false });
+
     // --- 1. SERVER-SIDE CART LOGIC (Replaces LocalStorage) ---
     var cart = cigStockTable.initialCart || [];
 
@@ -354,9 +362,6 @@ jQuery(function($) {
             $(document).on('keydown', '.cig-edit-input', function(e) {
                 if(e.which===13) { e.preventDefault(); processSave($(this), $(this).closest('td')); }
                 if(e.which===27) { e.preventDefault(); $(this).closest('td').find('.cig-cancel-btn').click(); }
-            });
-            $(document).on('wheel', '.cig-edit-input', function() {
-                if (document.activeElement === this) this.blur();
             });
 
             $(document).on('click', '.cig-product-thumb', function() {
