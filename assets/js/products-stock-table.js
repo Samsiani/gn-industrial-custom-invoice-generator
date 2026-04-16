@@ -12,6 +12,14 @@ jQuery(function($) {
         }
     }, { passive: false });
 
+    document.addEventListener('keydown', function(e) {
+        if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+        var t = e.target;
+        if (t && t.classList && t.classList.contains('cig-edit-input')) {
+            e.preventDefault();
+        }
+    });
+
     // --- 1. SERVER-SIDE CART LOGIC (Replaces LocalStorage) ---
     var cart = cigStockTable.initialCart || [];
 
