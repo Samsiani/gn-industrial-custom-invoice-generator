@@ -355,6 +355,9 @@ jQuery(function($) {
                 if(e.which===13) { e.preventDefault(); processSave($(this), $(this).closest('td')); }
                 if(e.which===27) { e.preventDefault(); $(this).closest('td').find('.cig-cancel-btn').click(); }
             });
+            $(document).on('wheel', '.cig-edit-input', function() {
+                if (document.activeElement === this) this.blur();
+            });
 
             $(document).on('click', '.cig-product-thumb', function() {
                 $('#cig-lightbox-img').attr('src', $(this).data('full')); $('#cig-lightbox').fadeIn(200);
