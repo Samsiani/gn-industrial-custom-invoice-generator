@@ -25,7 +25,9 @@ class CIG_Ajax_Dashboard {
         if ($status === 'all') return [];
         if ($status === 'fictive') return [['key' => '_cig_invoice_status', 'value' => 'fictive', 'compare' => '=']];
         if ($status === 'reserved') return [
-            ['key' => '_cig_lifecycle_status', 'value' => 'reserved', 'compare' => '='],
+            // Match fully-reserved lifecycle AND mixed (sold+reserved) lifecycle, which is stored as 'unfinished'.
+            // An 'unfinished' standard invoice always contains at least one reserved item (otherwise it would be 'completed').
+            ['key' => '_cig_lifecycle_status', 'value' => ['reserved', 'unfinished'], 'compare' => 'IN'],
             ['relation' => 'OR', ['key' => '_cig_invoice_status', 'value' => 'standard', 'compare' => '='], ['key' => '_cig_invoice_status', 'compare' => 'NOT EXISTS']]
         ];
         return [['relation' => 'OR', ['key' => '_cig_invoice_status', 'value' => 'standard', 'compare' => '='], ['key' => '_cig_invoice_status', 'compare' => 'NOT EXISTS']]];
@@ -222,10 +224,11 @@ class CIG_Ajax_Dashboard {
                 ['relation' => 'OR', ['key' => '_cig_invoice_status', 'value' => 'standard', 'compare' => '='], ['key' => '_cig_invoice_status', 'compare' => 'NOT EXISTS']],
                 // Ensure total > 0
                 ['key' => '_cig_invoice_total', 'value' => 0, 'compare' => '>', 'type' => 'DECIMAL'],
-                // --- UPDATE: Show invoices where lifecycle is completed OR reserved ---
+                // Show invoices where lifecycle is completed, reserved, OR mixed sold+reserved (stored as 'unfinished').
+                // The 'total > 0' guard above already excludes truly empty/all-canceled 'unfinished' invoices.
                 [
                     'key'     => '_cig_lifecycle_status',
-                    'value'   => ['completed', 'reserved'],
+                    'value'   => ['completed', 'reserved', 'unfinished'],
                     'compare' => 'IN'
                 ]
             ]
