@@ -415,18 +415,23 @@ jQuery(function ($) {
   }
   $(document).on('input', '.quantity', function () { var $row = $(this).closest('tr'); updateRowTotal($row); checkStock($row); });
   $(document).on('input', '.price', function () { updateRowTotal($(this).closest('tr')); });
-  // Sale %: type a percentage to discount the original price; rounds new price to integer
+  // Sale %: type a percentage to discount the original price; rounds new price to integer.
+  // Clearing the field restores the original (full) price and hides the discount display.
   $(document).on('input', '.sale-percent', function () {
     var $row = $(this).closest('tr');
     var origPrice = parseFloat($row.attr('data-original-price')) || 0;
     if (origPrice <= 0) return;
     var raw = $(this).val();
-    if (raw === '') return; // don't override price when cleared
-    var saleVal = parseFloat(raw);
-    if (isNaN(saleVal)) return;
-    if (saleVal < 0) saleVal = 0;
-    if (saleVal > 100) saleVal = 100;
-    var newPrice = Math.round(origPrice * (1 - saleVal / 100));
+    var newPrice;
+    if (raw === '') {
+      newPrice = origPrice; // restore full price exactly as it was
+    } else {
+      var saleVal = parseFloat(raw);
+      if (isNaN(saleVal)) return;
+      if (saleVal < 0) saleVal = 0;
+      if (saleVal > 100) saleVal = 100;
+      newPrice = Math.round(origPrice * (1 - saleVal / 100));
+    }
     $row.find('.price').val(newPrice);
     updateRowTotal($row);
   });
