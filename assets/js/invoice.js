@@ -94,7 +94,7 @@ jQuery(function ($) {
                       '<div class="qty-btn-group"><button type="button" class="qty-btn qty-increase">▲</button><button type="button" class="qty-btn qty-decrease">▼</button></div>' +
                   '</div>' +
               '</td>' +
-              '<td class="col-price"><input type="number" class="price" step="1" value="' + price + '"><input type="number" class="sale-percent no-print" min="0" max="100" step="0.01" placeholder="Sale %"><span class="cig-original-price" style="display:none;"></span></td>' +
+              '<td class="col-price"><input type="number" class="price" step="1" value="' + price + '"><span class="sale-percent-wrap no-print"><input type="number" class="sale-percent" min="0" max="100" step="0.01" placeholder="Sale %"></span><span class="cig-original-price" style="display:none;"></span></td>' +
               '<td class="col-total"><input type="number" class="row-total" step="0.01" value="' + total + '"><span class="cig-original-total" style="display:none;"></span></td>' +
               '<td class="col-status no-print">' +
                   '<select class="product-status">' +
@@ -476,7 +476,7 @@ jQuery(function ($) {
           '<td class="col-brand"><input type="text" class="product-brand" readonly value="'+(it.brand||'')+'"></td>' +
           '<td class="col-desc"><textarea class="product-desc">'+(it.desc||'')+'</textarea></td>' +
           '<td class="col-qty"><div class="quantity-wrapper"><input type="number" class="quantity" min="1" value="'+(it.qty||1)+'"><div class="qty-btn-group"><button type="button" class="qty-btn qty-increase">▲</button><button type="button" class="qty-btn qty-decrease">▼</button></div></div></td>' +
-          '<td class="col-price"><input type="number" class="price" step="1" value="'+parseFloat(it.price||0).toFixed(2)+'"><input type="number" class="sale-percent no-print" min="0" max="100" step="0.01" placeholder="Sale %"><span class="cig-original-price" style="display:none;"></span></td>' +
+          '<td class="col-price"><input type="number" class="price" step="1" value="'+parseFloat(it.price||0).toFixed(2)+'"><span class="sale-percent-wrap no-print"><input type="number" class="sale-percent" min="0" max="100" step="0.01" placeholder="Sale %"></span><span class="cig-original-price" style="display:none;"></span></td>' +
           '<td class="col-total"><input type="number" class="row-total" step="0.01" value="'+parseFloat(it.total||0).toFixed(2)+'"><span class="cig-original-total" style="display:none;"></span></td>' +
           '<td class="col-status no-print">' +
             '<select class="product-status">' +
