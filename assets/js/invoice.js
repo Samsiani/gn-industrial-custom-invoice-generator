@@ -94,7 +94,7 @@ jQuery(function ($) {
                       '<div class="qty-btn-group"><button type="button" class="qty-btn qty-increase">▲</button><button type="button" class="qty-btn qty-decrease">▼</button></div>' +
                   '</div>' +
               '</td>' +
-              '<td class="col-price"><input type="number" class="price" step="0.01" value="' + price + '"><span class="cig-original-price" style="display:none;"></span></td>' +
+              '<td class="col-price"><input type="number" class="price" step="1" value="' + price + '"><input type="number" class="sale-percent no-print" min="0" max="100" step="0.01" placeholder="Sale %"><span class="cig-original-price" style="display:none;"></span></td>' +
               '<td class="col-total"><input type="number" class="row-total" step="0.01" value="' + total + '"><span class="cig-original-total" style="display:none;"></span></td>' +
               '<td class="col-status no-print">' +
                   '<select class="product-status">' +
@@ -110,10 +110,11 @@ jQuery(function ($) {
 
           var $row = $(html);
           $tbody.append($row);
-          
+
           $row.find('.product-status').val('none');
 
           initAutocomplete($row.find('.product-search'));
+          updateDiscountDisplay($row);
           checkStock($row);
       });
 
@@ -363,19 +364,28 @@ jQuery(function ($) {
     updateDiscountDisplay($row);
     updateGrandTotal();
   }
+  // Format discount %: up to 2 decimals, strip trailing zeros (8 -> "8", 7.5 -> "7.5", 7.54 -> "7.54")
+  function formatDiscountPct(pct) {
+    var s = pct.toFixed(2);
+    return s.indexOf('.') > -1 ? s.replace(/\.?0+$/, '') : s;
+  }
   function updateDiscountDisplay($row) {
     var qty = parseFloat($row.find('.quantity').val()) || 0;
     var price = parseFloat($row.find('.price').val()) || 0;
     var origPrice = parseFloat($row.attr('data-original-price')) || 0;
     var $discPrice = $row.find('.cig-original-price');
     var $discTotal = $row.find('.cig-original-total');
+    var $saleInput = $row.find('.sale-percent');
     if (origPrice > 0 && price < origPrice) {
-      var pct = Math.round((1 - price / origPrice) * 100);
-      if ($discPrice.length) $discPrice.text(origPrice.toFixed(2) + ' (-' + pct + '%)').show();
-      if ($discTotal.length) $discTotal.text((origPrice * qty).toFixed(2) + ' (-' + pct + '%)').show();
+      var pct = (1 - price / origPrice) * 100;
+      var pctStr = formatDiscountPct(pct);
+      if ($discPrice.length) $discPrice.text(origPrice.toFixed(2) + ' (-' + pctStr + '%)').show();
+      if ($discTotal.length) $discTotal.text((origPrice * qty).toFixed(2) + ' (-' + pctStr + '%)').show();
+      if ($saleInput.length && !$saleInput.is(':focus')) $saleInput.val(pctStr);
     } else {
       if ($discPrice.length) $discPrice.hide();
       if ($discTotal.length) $discTotal.hide();
+      if ($saleInput.length && !$saleInput.is(':focus')) $saleInput.val('');
     }
   }
   function updateGrandTotal() {
@@ -405,6 +415,21 @@ jQuery(function ($) {
   }
   $(document).on('input', '.quantity', function () { var $row = $(this).closest('tr'); updateRowTotal($row); checkStock($row); });
   $(document).on('input', '.price', function () { updateRowTotal($(this).closest('tr')); });
+  // Sale %: type a percentage to discount the original price; rounds new price to integer
+  $(document).on('input', '.sale-percent', function () {
+    var $row = $(this).closest('tr');
+    var origPrice = parseFloat($row.attr('data-original-price')) || 0;
+    if (origPrice <= 0) return;
+    var raw = $(this).val();
+    if (raw === '') return; // don't override price when cleared
+    var saleVal = parseFloat(raw);
+    if (isNaN(saleVal)) return;
+    if (saleVal < 0) saleVal = 0;
+    if (saleVal > 100) saleVal = 100;
+    var newPrice = Math.round(origPrice * (1 - saleVal / 100));
+    $row.find('.price').val(newPrice);
+    updateRowTotal($row);
+  });
   $(document).on('input', '.row-total', function () {
     var $row = $(this).closest('tr');
     var qty = parseFloat($row.find('.quantity').val()) || 0;
@@ -446,7 +471,7 @@ jQuery(function ($) {
           '<td class="col-brand"><input type="text" class="product-brand" readonly value="'+(it.brand||'')+'"></td>' +
           '<td class="col-desc"><textarea class="product-desc">'+(it.desc||'')+'</textarea></td>' +
           '<td class="col-qty"><div class="quantity-wrapper"><input type="number" class="quantity" min="1" value="'+(it.qty||1)+'"><div class="qty-btn-group"><button type="button" class="qty-btn qty-increase">▲</button><button type="button" class="qty-btn qty-decrease">▼</button></div></div></td>' +
-          '<td class="col-price"><input type="number" class="price" step="0.01" value="'+parseFloat(it.price||0).toFixed(2)+'"><span class="cig-original-price" style="display:none;"></span></td>' +
+          '<td class="col-price"><input type="number" class="price" step="1" value="'+parseFloat(it.price||0).toFixed(2)+'"><input type="number" class="sale-percent no-print" min="0" max="100" step="0.01" placeholder="Sale %"><span class="cig-original-price" style="display:none;"></span></td>' +
           '<td class="col-total"><input type="number" class="row-total" step="0.01" value="'+parseFloat(it.total||0).toFixed(2)+'"><span class="cig-original-total" style="display:none;"></span></td>' +
           '<td class="col-status no-print">' +
             '<select class="product-status">' +

@@ -124,7 +124,7 @@ $current_user = wp_get_current_user();
               </div>
             </div>
           </td>
-          <td class="col-price"><input type="number" class="price" value="0.00" step="0.01"><span class="cig-original-price" style="display:none;"></span></td>
+          <td class="col-price"><input type="number" class="price" value="0" step="1"><input type="number" class="sale-percent no-print" min="0" max="100" step="0.01" placeholder="<?php esc_attr_e('Sale %', 'cig'); ?>"><span class="cig-original-price" style="display:none;"></span></td>
           <td class="col-total"><input type="number" class="row-total" value="0.00" step="0.01"><span class="cig-original-total" style="display:none;"></span></td>
           <td class="col-status no-print">
             <select class="product-status">
