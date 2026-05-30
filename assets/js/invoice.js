@@ -447,7 +447,7 @@ jQuery(function ($) {
   }
   $(document).on('input', '.quantity', function () { var $row = $(this).closest('tr'); updateRowTotal($row); checkStock($row); });
   $(document).on('input', '.price', function () { updateRowTotal($(this).closest('tr')); });
-  // Sale %: type a percentage to discount the original price; rounds new price to integer.
+  // Sale %: type a percentage to discount the original price; keeps 2-decimal precision (e.g. 7.20 -> 6.32), not a whole number.
   // Clearing the field restores the original (full) price and hides the discount display.
   $(document).on('input', '.sale-percent', function () {
     var $row = $(this).closest('tr');
@@ -462,7 +462,7 @@ jQuery(function ($) {
       if (isNaN(saleVal)) return;
       if (saleVal < 0) saleVal = 0;
       if (saleVal > 100) saleVal = 100;
-      newPrice = Math.round(origPrice * (1 - saleVal / 100));
+      newPrice = (origPrice * (1 - saleVal / 100)).toFixed(2);
     }
     $row.find('.price').val(newPrice);
     updateRowTotal($row);
