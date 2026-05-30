@@ -16,6 +16,38 @@ jQuery(function ($) {
     return;
   }
 
+  // --- 1b. ACCIDENTAL-CHANGE GUARD ---
+  // Price / Sale % / Total / Qty are <input type="number">. Their spinner
+  // buttons are already hidden via CSS, but a focused number field still
+  // changes value on ArrowUp/ArrowDown and on mouse-wheel scroll — an easy way
+  // to silently corrupt a price. Block both so values change ONLY by typing.
+  // (Mirrors the products-stock-table guard. The Qty ▲▼ buttons are <button>
+  //  clicks, so they keep working.)
+  function cigIsGuardedField(el) {
+    return !!(el && el.classList && (
+      el.classList.contains('price') ||
+      el.classList.contains('sale-percent') ||
+      el.classList.contains('row-total') ||
+      el.classList.contains('quantity') ||
+      el.classList.contains('reservation-days')
+    ));
+  }
+  // Wheel only mutates a *focused* number input, so guard the focused case and
+  // blur it; an unfocused field over which the page is scrolled is left alone.
+  document.addEventListener('wheel', function (e) {
+    var t = e.target;
+    if (cigIsGuardedField(t) && document.activeElement === t) {
+      e.preventDefault();
+      t.blur();
+    }
+  }, { passive: false });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    if (cigIsGuardedField(e.target)) {
+      e.preventDefault();
+    }
+  });
+
   // 2. Global Variables
   var editMode = parseInt(cigAjax.editMode, 10) === 1;
   var invoiceId = parseInt(cigAjax.invoiceId, 10) || 0;

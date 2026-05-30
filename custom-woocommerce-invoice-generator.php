@@ -39,7 +39,7 @@ add_action('before_woocommerce_init', function() {
 /**
  * Plugin constants
  */
-define('CIG_VERSION', '4.9.24');
+define('CIG_VERSION', '4.9.25');
 define('CIG_PLUGIN_FILE', __FILE__);
 define('CIG_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('CIG_PLUGIN_URL', plugin_dir_url(__FILE__));
