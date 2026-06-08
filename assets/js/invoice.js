@@ -179,15 +179,21 @@ jQuery(function ($) {
   }
 
   function initCustomerAutocomplete($input) {
+      // Which buyer field this input is editing — the ს/კ ან პ/ნ field must keep
+      // the ID, never the customer name (the name belongs in the name field).
+      var isTax = ($('.buyer-details strong.editable-field').index($input.data('host')) === 1);
       $input.autocomplete({
           minLength: 2,
           source: function(request, response) { $.ajax({ url: cigAjax.ajax_url, method: 'POST', dataType: 'json', data: { action: 'cig_search_customers', nonce: cigAjax.nonce, term: request.term }, success: function(data) { response(data || []); }, error: function() { response([]); } }); },
+          focus: function(event, ui) {
+              // jQuery UI's default on arrow-key focus is to overwrite the input
+              // with ui.item.value (the customer NAME). Block that: on the ს/კ
+              // field show the ID, on the name field keep what's typed.
+              event.preventDefault();
+              if (isTax && ui.item && ui.item.tax_id) { $input.val(ui.item.tax_id); }
+              return false;
+          },
           select: function(event, ui) {
-              // Field-aware: keep the ID in the ს/კ field (never the customer
-              // name) and the name in the name field. Picking a suggestion on the
-              // ს/კ field also locks the identity (existing customer).
-              var $host = $input.data('host');
-              var isTax = ($('.buyer-details strong.editable-field').index($host) === 1);
               $input.val(isTax ? (ui.item.tax_id || '') : (ui.item.value || ui.item.tax_id || ''));
               fillCustomerData(ui.item);
               if (isTax && ui.item.tax_id) { applyBuyerLock(true); }
