@@ -163,9 +163,11 @@ jQuery(function ($) {
     var $host = $currentInput.data('host');
     var val = ($currentInput.val() || '').trim();
     var placeholder = $host.data('placeholder');
-    if (val === '') { $host.text(placeholder).addClass('is-empty'); if ($host.is('li > span')) $host.closest('li').addClass('is-empty'); } 
+    if (val === '') { $host.text(placeholder).addClass('is-empty'); if ($host.is('li > span')) $host.closest('li').addClass('is-empty'); }
     else { $host.text(val).removeClass('is-empty'); if ($host.is('li > span')) $host.closest('li').removeClass('is-empty'); }
     $host.show(); $currentInput.remove();
+    // If the ს/კ (tax) field was just committed, auto-fill + lock from a match.
+    if ($('.buyer-details strong.editable-field').index($host) === 1) { lookupBuyerByTax(val); }
   }
 
   function fillCustomerData(data) {
@@ -184,16 +186,60 @@ jQuery(function ($) {
       });
   }
 
+  // --- Auto-fill + LOCK by tax_id: ს/კ ან პ/ნ is the identity key. Entering an
+  //     existing ID fills the buyer and locks name/phone/address until the ID is
+  //     changed (a known identity can't be silently renamed). ---
+  var buyerLocked = false;
+  if (!document.getElementById('cig-buyer-lock-style')) {
+    $('<style id="cig-buyer-lock-style">' +
+      '.buyer-details.buyer-id-locked strong.editable-field:first-of-type,' +
+      '.buyer-details.buyer-id-locked .editable-value{cursor:not-allowed;background:#f4f6fb;border-radius:4px}' +
+      '.buyer-details.buyer-id-locked::after{content:"\\1F512 ს/კ-ით ჩაკეტილია — შესაცვლელად შეცვალეთ ს/კ";display:block;font-size:11px;color:#6a7181;margin-top:4px}' +
+      '</style>').appendTo('head');
+  }
+  function fillBuyerFromCustomer(data) {
+    var $bf = $('.buyer-details');
+    var setVal = function (el, val) { if (val && val !== '') { el.text(val).removeClass('is-empty'); if (el.is('li > span')) el.closest('li').removeClass('is-empty'); } };
+    setVal($bf.find('strong.editable-field').eq(0), data.name);
+    setVal($bf.find('span.editable-value').eq(0), data.address);
+    setVal($bf.find('span.editable-value').eq(1), data.phone);
+    setVal($bf.find('span.editable-value').eq(2), data.email);
+  }
+  function applyBuyerLock(locked) {
+    buyerLocked = locked;
+    var $bf = $('.buyer-details');
+    $bf.toggleClass('buyer-id-locked', locked);
+    $bf.find('strong.editable-field').eq(0).attr('contenteditable', locked ? 'false' : 'true');
+    $bf.find('span.editable-value').attr('contenteditable', locked ? 'false' : 'true');
+  }
+  function lookupBuyerByTax(tax) {
+    tax = (tax || '').trim();
+    if (!tax) { applyBuyerLock(false); return; }
+    $.ajax({
+      url: cigAjax.ajax_url, method: 'POST', dataType: 'json',
+      data: { action: 'cig_lookup_by_tax', nonce: cigAjax.nonce, tax_id: tax },
+      success: function (resp) {
+        if (resp && resp.success && resp.data && resp.data.found) { fillBuyerFromCustomer(resp.data); applyBuyerLock(true); }
+        else { applyBuyerLock(false); }
+      },
+      error: function () { applyBuyerLock(false); }
+    });
+  }
+
   $(document).on('click', '.buyer-details [data-placeholder]', function () {
     if (isReadOnly) return;
     var $host = $(this); if ($host.is('input') || $host.is(':hidden')) return;
+    var strongIndex = $('.buyer-details strong.editable-field').index($host);
+    var isTaxField = (strongIndex === 1);
+    // When locked, only the ს/კ field is editable; editing it unlocks the rest.
+    if (buyerLocked && !isTaxField) return;
+    if (buyerLocked && isTaxField) applyBuyerLock(false);
     saveCurrentEditableField();
     var isEmpty = $host.hasClass('is-empty') || $host.closest('li').hasClass('is-empty');
     var currentValue = isEmpty ? '' : $host.text();
     var cls = 'buyer-field-input'; if ($host.is('strong')) cls += ' editable-field';
     var $input = $('<input type="text" class="' + cls + '">').val(currentValue).data('host', $host);
     $host.hide().after($input); $input.focus();
-    var strongIndex = $('.buyer-details strong.editable-field').index($host);
     if (strongIndex === 0 || strongIndex === 1) initCustomerAutocomplete($input);
   });
   $(document).on('blur', '.buyer-field-input', function() { setTimeout(saveCurrentEditableField, 200); });

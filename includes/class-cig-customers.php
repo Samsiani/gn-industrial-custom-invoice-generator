@@ -19,6 +19,42 @@ class CIG_Customers {
         
         // AJAX Search for Autocomplete
         add_action('wp_ajax_cig_search_customers', [$this, 'ajax_search_customers']);
+        // AJAX exact lookup by tax_id (drives the form's auto-fill + lock)
+        add_action('wp_ajax_cig_lookup_by_tax', [$this, 'ajax_lookup_by_tax']);
+    }
+
+    /**
+     * Exact-match lookup of a customer by tax_id against the authoritative
+     * wp_cig_customers table. Used by the invoice form: when a consultant enters
+     * an existing ს/კ ან პ/ნ, the buyer name/phone/address auto-fill and lock —
+     * an existing identity can't be renamed without changing the ID.
+     */
+    public function ajax_lookup_by_tax() {
+        check_ajax_referer( 'cig_nonce', 'nonce' );
+        if ( ! current_user_can( 'edit_posts' ) ) {
+            wp_send_json_error( [ 'message' => 'Permission denied' ] );
+        }
+        $tax_id = sanitize_text_field( wp_unslash( $_POST['tax_id'] ?? '' ) );
+        if ( $tax_id === '' ) {
+            wp_send_json_success( [ 'found' => false ] );
+        }
+        global $wpdb;
+        $table = $wpdb->prefix . 'cig_customers';
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        $row = $wpdb->get_row( $wpdb->prepare(
+            "SELECT name, phone, email, address FROM {$table} WHERE tax_id = %s LIMIT 1",
+            $tax_id
+        ), ARRAY_A );
+        if ( ! $row ) {
+            wp_send_json_success( [ 'found' => false ] );
+        }
+        wp_send_json_success( [
+            'found'   => true,
+            'name'    => $row['name'],
+            'phone'   => $row['phone'],
+            'email'   => $row['email'],
+            'address' => $row['address'],
+        ] );
     }
 
     /**

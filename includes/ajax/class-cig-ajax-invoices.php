@@ -189,6 +189,26 @@ class CIG_Ajax_Invoices {
             wp_send_json_error(['message' => 'შეავსეთ მყიდველის სახელი, ს/კ და ტელეფონი.'], 400);
         }
 
+        // Identity enforcement (backstop for the form's auto-fill + lock):
+        // if this tax_id already belongs to a customer, that customer's identity
+        // is authoritative — bind the buyer NAME to it (an existing ს/კ can't be
+        // renamed). Contact details fall back to the stored values when present.
+        if (!empty($buyer['tax_id'])) {
+            global $wpdb;
+            $ctable = $wpdb->prefix . 'cig_customers';
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+            $existing_cust = $wpdb->get_row($wpdb->prepare(
+                "SELECT name, phone, email, address FROM {$ctable} WHERE tax_id = %s LIMIT 1",
+                sanitize_text_field($buyer['tax_id'])
+            ), ARRAY_A);
+            if ($existing_cust && !empty($existing_cust['name'])) {
+                $buyer['name'] = $existing_cust['name'];
+                if (empty($buyer['phone'])   && !empty($existing_cust['phone']))   { $buyer['phone']   = $existing_cust['phone']; }
+                if (empty($buyer['address']) && !empty($existing_cust['address'])) { $buyer['address'] = $existing_cust['address']; }
+                if (empty($buyer['email'])   && !empty($existing_cust['email']))   { $buyer['email']   = $existing_cust['email']; }
+            }
+        }
+
         $num = sanitize_text_field($d['invoice_number'] ?? '');
         
         // NEW: General Note
