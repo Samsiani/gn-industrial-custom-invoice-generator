@@ -3,7 +3,7 @@
  * Plugin Name: Custom WooCommerce Invoice Generator
  * Plugin URI: https://example.com/invoice-generator
  * Description: Professional invoice generator with advanced stock reservation, real-time validation, and comprehensive analytics.
- * Version: 4.9.28
+ * Version: 4.9.31
  * Author: Samsiani
  * Author URI: https://example.com
  * Text Domain: cig
@@ -39,7 +39,7 @@ add_action('before_woocommerce_init', function() {
 /**
  * Plugin constants
  */
-define('CIG_VERSION', '4.9.28');
+define('CIG_VERSION', '4.9.31');
 define('CIG_PLUGIN_FILE', __FILE__);
 define('CIG_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('CIG_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -57,6 +57,13 @@ define('CIG_DEFAULT_RESERVATION_DAYS', 30);
 define('CIG_PRODUCTS_PER_PAGE', 50);
 define('CIG_INVOICE_NUMBER_PREFIX', 'N');
 define('CIG_INVOICE_NUMBER_BASE', 25000000);
+
+// Public storefront URL. The WP admin runs on admin.gn.ge (WP_HOME), but the
+// public frontend lives on gn.ge, so product links in the stock table must point
+// there. Override via the 'cig_public_frontend_url' filter if the host changes.
+if (!defined('CIG_PUBLIC_FRONTEND_URL')) {
+    define('CIG_PUBLIC_FRONTEND_URL', 'https://gn.ge');
+}
 
 /**
  * Main plugin class (Singleton)

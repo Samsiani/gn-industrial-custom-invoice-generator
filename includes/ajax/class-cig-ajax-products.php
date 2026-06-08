@@ -264,7 +264,14 @@ class CIG_Ajax_Products {
                     if($f) $payload['full_image'] = $f[0];
                 }
                 
-                $payload['product_url'] = get_permalink($product_id);
+                // Stock-table product links must open on the public storefront
+                // (gn.ge), not the admin host (admin.gn.ge = WP_HOME). Swap only the
+                // home host; the slug/path stays identical between the two.
+                $cig_permalink = get_permalink($product_id);
+                $cig_public_base = apply_filters('cig_public_frontend_url', CIG_PUBLIC_FRONTEND_URL);
+                $payload['product_url'] = $cig_public_base
+                    ? str_replace(untrailingslashit(home_url()), untrailingslashit($cig_public_base), $cig_permalink)
+                    : $cig_permalink;
                 $payload['pending_data'] = $pending_map[$product_id] ?? [];
                 $payload['price'] = wc_price($payload['price']);
 

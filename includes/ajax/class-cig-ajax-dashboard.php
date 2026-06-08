@@ -351,10 +351,24 @@ class CIG_Ajax_Dashboard {
             ));
             $total_num = (float)$total;
 
+            // Invoice author (WordPress user first/last name, fallback to display name)
+            $author_id   = (int) get_post_field('post_author', $id);
+            $author_name = '';
+            if ($author_id) {
+                $first = get_the_author_meta('first_name', $author_id);
+                $last  = get_the_author_meta('last_name', $author_id);
+                $author_name = trim($first . ' ' . $last);
+                if ($author_name === '') {
+                    $author_name = get_the_author_meta('display_name', $author_id);
+                }
+                $author_name = esc_html($author_name);
+            }
+
             $invoices[] = [
                 'id'          => $id,
                 'number'      => get_post_meta($id, '_cig_invoice_number', true),
                 'date'        => date('Y-m-d', strtotime($date)),
+                'author_name' => $author_name,
                 'sold_date'   => $sold_date ?: '',
                 'total'       => number_format($total_num, 2) . ' ₾',
                 'original_total' => ($orig_tot > $total_num + 0.01) ? number_format($orig_tot, 2) . ' ₾' : '',

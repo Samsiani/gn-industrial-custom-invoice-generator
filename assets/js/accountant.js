@@ -112,6 +112,7 @@ jQuery(function($) {
 
                 var colInv = '<a href="' + inv.view_url + '" target="_blank" style="font-weight:700; color:#50529d; display:block; font-size:14px;">' + inv.number + '</a>' +
                              '<span style="font-size:11px; color:#888;">' + inv.date + '</span>';
+                if (inv.author_name) colInv += '<span style="font-size:11px; color:#333333; display:block; font-weight:bold;">' + inv.author_name + '</span>';
 
                 // Sold Date column
                 var colSoldDate = inv.sold_date ? '<span style="font-size:13px; color:#333;">' + inv.sold_date + '</span>' : '<span style="color:#ccc;">—</span>';
