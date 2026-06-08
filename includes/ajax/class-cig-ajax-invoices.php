@@ -398,6 +398,13 @@ class CIG_Ajax_Invoices {
             'author_id'        => get_current_user_id(),
             'general_note'     => $general_note,
             'sold_date'        => $sold_date,
+            // Immutable buyer snapshot on the invoice itself (so stats show the
+            // real buyer, independent of the shared customer record).
+            'buyer_name'       => $buyer['name'] ?? '',
+            'buyer_tax_id'     => $buyer['tax_id'] ?? '',
+            'buyer_phone'      => $buyer['phone'] ?? '',
+            'buyer_address'    => $buyer['address'] ?? '',
+            'buyer_email'      => $buyer['email'] ?? '',
             'items'            => $items,
             'payments'         => $hist
         ];
@@ -481,9 +488,14 @@ class CIG_Ajax_Invoices {
                     'sold_date'        => $sold_date,
                     'author_id'        => intval($data['author_id']),
                     'general_note'     => $data['general_note'],
-                    'is_rs_uploaded'   => 0
+                    'is_rs_uploaded'   => 0,
+                    'buyer_name'       => $data['buyer_name'] ?? '',
+                    'buyer_tax_id'     => $data['buyer_tax_id'] ?? '',
+                    'buyer_phone'      => $data['buyer_phone'] ?? '',
+                    'buyer_address'    => $data['buyer_address'] ?? '',
+                    'buyer_email'      => $data['buyer_email'] ?? ''
                 ],
-                ['%d', '%s', '%d', '%s', '%s', '%f', '%f', '%s', '%s', '%s', '%d', '%s', '%d']
+                ['%d', '%s', '%d', '%s', '%s', '%f', '%f', '%s', '%s', '%s', '%d', '%s', '%d', '%s', '%s', '%s', '%s', '%s']
             );
 
             if ($result !== false) {
@@ -547,9 +559,14 @@ class CIG_Ajax_Invoices {
             'lifecycle_status' => $data['lifecycle_status'],
             'total_amount'     => floatval($data['total_amount']),
             'paid_amount'      => floatval($data['paid_amount']),
-            'general_note'     => $data['general_note']
+            'general_note'     => $data['general_note'],
+            'buyer_name'       => $data['buyer_name'] ?? '',
+            'buyer_tax_id'     => $data['buyer_tax_id'] ?? '',
+            'buyer_phone'      => $data['buyer_phone'] ?? '',
+            'buyer_address'    => $data['buyer_address'] ?? '',
+            'buyer_email'      => $data['buyer_email'] ?? ''
         ];
-        $update_format = ['%s', '%d', '%s', '%s', '%f', '%f', '%s'];
+        $update_format = ['%s', '%d', '%s', '%s', '%f', '%f', '%s', '%s', '%s', '%s', '%s', '%s'];
 
         // Handle sold_date field
         if (isset($data['sold_date'])) {

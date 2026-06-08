@@ -67,26 +67,25 @@ class CIG_Customers {
         }
 
         // 1. Sync to Legacy Post Type (cig_customer)
+        // Identity is keyed by tax_id and is IMMUTABLE once created: a later
+        // invoice with the same tax_id must NOT rename or overwrite the existing
+        // customer. We only create the record the first time a tax_id is seen.
         $existing_post_id = $this->get_customer_id_by_tax_id($tax_id);
 
-        $post_args = [
-            'post_type'   => $this->post_type,
-            'post_title'  => $name,
-            'post_status' => 'publish',
-        ];
-
         if ($existing_post_id) {
-            $post_args['ID'] = $existing_post_id;
-            $customer_post_id = wp_update_post($post_args);
+            $customer_post_id = $existing_post_id;
         } else {
-            $customer_post_id = wp_insert_post($post_args);
-        }
-
-        if (!is_wp_error($customer_post_id) && $customer_post_id) {
-            update_post_meta($customer_post_id, '_cig_customer_tax_id', $tax_id);
-            update_post_meta($customer_post_id, '_cig_customer_address', $address);
-            update_post_meta($customer_post_id, '_cig_customer_phone', $phone);
-            update_post_meta($customer_post_id, '_cig_customer_email', $email);
+            $customer_post_id = wp_insert_post([
+                'post_type'   => $this->post_type,
+                'post_title'  => $name,
+                'post_status' => 'publish',
+            ]);
+            if (!is_wp_error($customer_post_id) && $customer_post_id) {
+                update_post_meta($customer_post_id, '_cig_customer_tax_id', $tax_id);
+                update_post_meta($customer_post_id, '_cig_customer_address', $address);
+                update_post_meta($customer_post_id, '_cig_customer_phone', $phone);
+                update_post_meta($customer_post_id, '_cig_customer_email', $email);
+            }
         }
 
         // 2. Sync to Custom Table (wp_cig_customers) - PRIMARY storage for statistics
@@ -110,22 +109,12 @@ class CIG_Customers {
         );
 
         if ($existing_custom_id) {
-            // Update existing customer in custom table (including tax_id for data integrity)
-            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-            $result = $wpdb->update(
-                $table_customers,
-                [
-                    'tax_id'  => $tax_id,
-                    'name'    => $name,
-                    'phone'   => $phone,
-                    'email'   => $email,
-                    'address' => $address,
-                ],
-                ['id' => $existing_custom_id],
-                ['%s', '%s', '%s', '%s', '%s'],
-                ['%d']
-            );
-            // Return existing ID even if update had no changes (returns 0 when no rows affected)
+            // Existing customer for this tax_id — IDENTITY IS IMMUTABLE here.
+            // Do NOT overwrite name/phone/email/address from this invoice; the
+            // stored customer record is authoritative (a different real buyer
+            // must be entered under a different tax_id). This is what prevents
+            // the shared-placeholder corruption (e.g. every "000" sale rewriting
+            // one customer's name). The invoice keeps its own buyer snapshot.
             return intval($existing_custom_id);
         } else {
             // Insert new customer into custom table
