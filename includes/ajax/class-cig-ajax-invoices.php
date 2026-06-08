@@ -189,6 +189,26 @@ class CIG_Ajax_Invoices {
             wp_send_json_error(['message' => 'შეავსეთ მყიდველის სახელი, ს/კ და ტელეფონი.'], 400);
         }
 
+        // Identity enforcement (backstop for the form's auto-fill + lock):
+        // if this tax_id already belongs to a customer, that customer's identity
+        // is authoritative — bind the buyer NAME to it (an existing ს/კ can't be
+        // renamed). Contact details fall back to the stored values when present.
+        if (!empty($buyer['tax_id'])) {
+            global $wpdb;
+            $ctable = $wpdb->prefix . 'cig_customers';
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+            $existing_cust = $wpdb->get_row($wpdb->prepare(
+                "SELECT name, phone, email, address FROM {$ctable} WHERE tax_id = %s LIMIT 1",
+                sanitize_text_field($buyer['tax_id'])
+            ), ARRAY_A);
+            if ($existing_cust && !empty($existing_cust['name'])) {
+                $buyer['name'] = $existing_cust['name'];
+                if (empty($buyer['phone'])   && !empty($existing_cust['phone']))   { $buyer['phone']   = $existing_cust['phone']; }
+                if (empty($buyer['address']) && !empty($existing_cust['address'])) { $buyer['address'] = $existing_cust['address']; }
+                if (empty($buyer['email'])   && !empty($existing_cust['email']))   { $buyer['email']   = $existing_cust['email']; }
+            }
+        }
+
         $num = sanitize_text_field($d['invoice_number'] ?? '');
         
         // NEW: General Note
@@ -398,6 +418,13 @@ class CIG_Ajax_Invoices {
             'author_id'        => get_current_user_id(),
             'general_note'     => $general_note,
             'sold_date'        => $sold_date,
+            // Immutable buyer snapshot on the invoice itself (so stats show the
+            // real buyer, independent of the shared customer record).
+            'buyer_name'       => $buyer['name'] ?? '',
+            'buyer_tax_id'     => $buyer['tax_id'] ?? '',
+            'buyer_phone'      => $buyer['phone'] ?? '',
+            'buyer_address'    => $buyer['address'] ?? '',
+            'buyer_email'      => $buyer['email'] ?? '',
             'items'            => $items,
             'payments'         => $hist
         ];
@@ -481,9 +508,14 @@ class CIG_Ajax_Invoices {
                     'sold_date'        => $sold_date,
                     'author_id'        => intval($data['author_id']),
                     'general_note'     => $data['general_note'],
-                    'is_rs_uploaded'   => 0
+                    'is_rs_uploaded'   => 0,
+                    'buyer_name'       => $data['buyer_name'] ?? '',
+                    'buyer_tax_id'     => $data['buyer_tax_id'] ?? '',
+                    'buyer_phone'      => $data['buyer_phone'] ?? '',
+                    'buyer_address'    => $data['buyer_address'] ?? '',
+                    'buyer_email'      => $data['buyer_email'] ?? ''
                 ],
-                ['%d', '%s', '%d', '%s', '%s', '%f', '%f', '%s', '%s', '%s', '%d', '%s', '%d']
+                ['%d', '%s', '%d', '%s', '%s', '%f', '%f', '%s', '%s', '%s', '%d', '%s', '%d', '%s', '%s', '%s', '%s', '%s']
             );
 
             if ($result !== false) {
@@ -547,9 +579,14 @@ class CIG_Ajax_Invoices {
             'lifecycle_status' => $data['lifecycle_status'],
             'total_amount'     => floatval($data['total_amount']),
             'paid_amount'      => floatval($data['paid_amount']),
-            'general_note'     => $data['general_note']
+            'general_note'     => $data['general_note'],
+            'buyer_name'       => $data['buyer_name'] ?? '',
+            'buyer_tax_id'     => $data['buyer_tax_id'] ?? '',
+            'buyer_phone'      => $data['buyer_phone'] ?? '',
+            'buyer_address'    => $data['buyer_address'] ?? '',
+            'buyer_email'      => $data['buyer_email'] ?? ''
         ];
-        $update_format = ['%s', '%d', '%s', '%s', '%f', '%f', '%s'];
+        $update_format = ['%s', '%d', '%s', '%s', '%f', '%f', '%s', '%s', '%s', '%s', '%s', '%s'];
 
         // Handle sold_date field
         if (isset($data['sold_date'])) {

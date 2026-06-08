@@ -155,7 +155,9 @@ class CIG_Ajax_Statistics {
         // Search filter: invoice_number, customer_name, customer_tax_id
         if ($search) {
             $search_like = '%' . $wpdb->esc_like($search) . '%';
-            $where_revenue .= " AND (i.invoice_number LIKE %s OR c.name LIKE %s OR c.tax_id LIKE %s)";
+            $where_revenue .= " AND (i.invoice_number LIKE %s OR c.name LIKE %s OR c.tax_id LIKE %s OR i.buyer_name LIKE %s OR i.buyer_tax_id LIKE %s)";
+            $params_revenue[] = $search_like;
+            $params_revenue[] = $search_like;
             $params_revenue[] = $search_like;
             $params_revenue[] = $search_like;
             $params_revenue[] = $search_like;
@@ -202,7 +204,9 @@ class CIG_Ajax_Statistics {
         // Search filter for cashflow
         if ($search) {
             $search_like = '%' . $wpdb->esc_like($search) . '%';
-            $where_cashflow .= " AND (i.invoice_number LIKE %s OR c.name LIKE %s OR c.tax_id LIKE %s)";
+            $where_cashflow .= " AND (i.invoice_number LIKE %s OR c.name LIKE %s OR c.tax_id LIKE %s OR i.buyer_name LIKE %s OR i.buyer_tax_id LIKE %s)";
+            $params_cashflow[] = $search_like;
+            $params_cashflow[] = $search_like;
             $params_cashflow[] = $search_like;
             $params_cashflow[] = $search_like;
             $params_cashflow[] = $search_like;
@@ -254,7 +258,9 @@ class CIG_Ajax_Statistics {
         // Search filter for items
         if ($search) {
             $search_like = '%' . $wpdb->esc_like($search) . '%';
-            $where_items .= " AND (i.invoice_number LIKE %s OR c.name LIKE %s OR c.tax_id LIKE %s)";
+            $where_items .= " AND (i.invoice_number LIKE %s OR c.name LIKE %s OR c.tax_id LIKE %s OR i.buyer_name LIKE %s OR i.buyer_tax_id LIKE %s)";
+            $params_items[] = $search_like;
+            $params_items[] = $search_like;
             $params_items[] = $search_like;
             $params_items[] = $search_like;
             $params_items[] = $search_like;
@@ -605,7 +611,9 @@ class CIG_Ajax_Statistics {
         // Search filter: invoice_number, customer_name, customer_tax_id
         if ($search) {
             $search_like = '%' . $wpdb->esc_like($search) . '%';
-            $where .= " AND (i.invoice_number LIKE %s OR c.name LIKE %s OR c.tax_id LIKE %s)";
+            $where .= " AND (i.invoice_number LIKE %s OR c.name LIKE %s OR c.tax_id LIKE %s OR i.buyer_name LIKE %s OR i.buyer_tax_id LIKE %s)";
+            $params[] = $search_like;
+            $params[] = $search_like;
             $params[] = $search_like;
             $params[] = $search_like;
             $params[] = $search_like;
@@ -649,7 +657,7 @@ class CIG_Ajax_Statistics {
                 i.status,
                 i.sale_date,
                 i.author_id,
-                c.name as customer_name
+                COALESCE(NULLIF(i.buyer_name, ''), c.name) as customer_name
                 FROM {$this->table_invoices} i
                 LEFT JOIN {$this->table_customers} c ON i.customer_id = c.id
                 {$where}
@@ -702,7 +710,7 @@ class CIG_Ajax_Statistics {
                 i.sale_date,
                 i.created_at,
                 i.author_id,
-                c.name as customer_name
+                COALESCE(NULLIF(i.buyer_name, ''), c.name) as customer_name
                 FROM {$this->table_invoices} i
                 LEFT JOIN {$this->table_customers} c ON i.customer_id = c.id
                 {$where}
