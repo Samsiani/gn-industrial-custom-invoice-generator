@@ -182,7 +182,17 @@ jQuery(function ($) {
       $input.autocomplete({
           minLength: 2,
           source: function(request, response) { $.ajax({ url: cigAjax.ajax_url, method: 'POST', dataType: 'json', data: { action: 'cig_search_customers', nonce: cigAjax.nonce, term: request.term }, success: function(data) { response(data || []); }, error: function() { response([]); } }); },
-          select: function(event, ui) { $input.val(ui.item.value || ui.item.tax_id); fillCustomerData(ui.item); return false; }
+          select: function(event, ui) {
+              // Field-aware: keep the ID in the ს/კ field (never the customer
+              // name) and the name in the name field. Picking a suggestion on the
+              // ს/კ field also locks the identity (existing customer).
+              var $host = $input.data('host');
+              var isTax = ($('.buyer-details strong.editable-field').index($host) === 1);
+              $input.val(isTax ? (ui.item.tax_id || '') : (ui.item.value || ui.item.tax_id || ''));
+              fillCustomerData(ui.item);
+              if (isTax && ui.item.tax_id) { applyBuyerLock(true); }
+              return false;
+          }
       });
   }
 
