@@ -32,6 +32,9 @@ class CIG_Ajax_Invoices {
     /** @var CIG_Invoice_Manager */
     private $invoice_manager;
 
+    /** @var string Idempotency option key for the in-flight create (empty = none) */
+    private $idem_key = '';
+
     /** @var string Table names */
     private $table_invoices;
     private $table_items;
@@ -311,12 +314,35 @@ class CIG_Ajax_Invoices {
             ]);
             $pid = $id;
         } else {
-            if ($st === 'standard') { 
-                $err = $this->stock->validate_stock($items, 0); 
+            if ($st === 'standard') {
+                $err = $this->stock->validate_stock($items, 0);
                 if ($err) {
-                    wp_send_json_error(['message' => 'Stock error', 'errors' => $err], 400); 
+                    wp_send_json_error(['message' => 'Stock error', 'errors' => $err], 400);
                 }
             }
+
+            // --- DUPLICATE-SUBMISSION GUARD (create only) ---
+            // A backend retry (e.g. lsphp worker death mid-request) or a user
+            // re-clicking Save after a transport error re-executes this handler
+            // with the same submission; without a guard every execution mints a
+            // new invoice (incident: N350000312/313/314, 2026-06-10).
+            // Both layers answer with the ALREADY-CREATED invoice — they never
+            // reject the save, so legitimate creation is never blocked.
+            $idem_token = sanitize_key(wp_unslash($_POST['idem_token'] ?? ''));
+            $guard = $this->idem_guard_acquire($idem_token);
+            if (is_int($guard)) {
+                $this->respond_existing_invoice($guard, 'token');
+            }
+            if ($guard === 'busy') {
+                wp_send_json_error(['message' => __('This invoice is already being saved. Please wait a few seconds — then check your invoice list before saving again.', 'cig')]);
+            }
+            // 'acquired' or 'takeover': fingerprint safety net for token-less
+            // clients (stale cached JS) and for takeovers after a dead worker.
+            $dup_id = $this->find_recent_duplicate(get_current_user_id(), $buyer['tax_id'] ?? '', $items);
+            if ($dup_id) {
+                $this->respond_existing_invoice($dup_id, 'fingerprint');
+            }
+
             $new_num = CIG_Invoice::ensure_unique_number($num);
             $pid = wp_insert_post([
                 'post_type'   => 'invoice',
@@ -458,9 +484,15 @@ class CIG_Ajax_Invoices {
         // --- FULL CACHE PURGE (WP + LiteSpeed) ---
         $this->purge_cache($pid);
 
+        // Record the created invoice against the idempotency token so a retried
+        // execution of this same submission returns it instead of duplicating.
+        if (!$update && $this->idem_key !== '') {
+            update_option($this->idem_key, time() . '|' . intval($pid), 'no');
+        }
+
         wp_send_json_success([
-            'post_id'        => $pid, 
-            'view_url'       => get_permalink($pid), 
+            'post_id'        => $pid,
+            'view_url'       => get_permalink($pid),
             'invoice_number' => $new_num,
             'status'         => $st
         ]);
@@ -995,6 +1027,169 @@ class CIG_Ajax_Invoices {
         if (defined('LSCWP_V')) {
             $tag = 'PO.' . $post_id;
             @header('X-LiteSpeed-Purge: ' . $tag);
+        }
+    }
+
+    /**
+     * Acquire the idempotency lock for an invoice-create submission.
+     *
+     * The lock is an option row (option_name has a UNIQUE index, so add_option
+     * is atomic across concurrent PHP workers). Value format: "<unix_ts>|pending"
+     * while the create runs, "<unix_ts>|<post_id>" once it has succeeded.
+     *
+     * @param string $token Client-generated token (one per form page view).
+     * @return int|string Existing post ID when this submission already created
+     *                    an invoice; 'acquired' to proceed; 'takeover' to proceed
+     *                    because the previous execution died mid-create (the
+     *                    fingerprint check still protects this path); 'busy' when
+     *                    the same submission is still being processed.
+     */
+    private function idem_guard_acquire($token) {
+        if ($token === '') {
+            return 'acquired'; // token-less client (stale cached JS) — fingerprint layer still applies
+        }
+
+        global $wpdb;
+        $key = 'cig_idem_' . $token;
+
+        if (add_option($key, time() . '|pending', '', 'no')) {
+            $this->idem_key = $key;
+            $this->cleanup_idem_options();
+            return 'acquired';
+        }
+
+        // The same token was already submitted: a retried request. Wait briefly
+        // for the first execution to finish, then return its invoice.
+        for ($i = 0; $i < 8; $i++) {
+            // Read uncached — get_option() would serve this request's stale cache.
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+            $val = $wpdb->get_var($wpdb->prepare(
+                "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s",
+                $key
+            ));
+            if ($val === null) {
+                $this->idem_key = $key;
+                return 'acquired';
+            }
+            $parts = array_pad(explode('|', (string) $val, 2), 2, '');
+            $ts    = intval($parts[0]);
+            $state = $parts[1];
+
+            if ($state !== 'pending' && ctype_digit($state)) {
+                $pid = intval($state);
+                if ($pid > 0 && get_post_status($pid) === 'publish') {
+                    return $pid;
+                }
+                $this->idem_key = $key;
+                return 'acquired'; // recorded invoice no longer exists — allow a fresh create
+            }
+
+            if (time() - $ts > 60) {
+                // The execution holding the lock died mid-create. Proceed, but
+                // keep the key so this run records its result; the fingerprint
+                // check below catches anything the dead run managed to create.
+                $this->idem_key = $key;
+                return 'takeover';
+            }
+
+            sleep(1);
+        }
+
+        return 'busy';
+    }
+
+    /**
+     * Find an invoice the same author created for the same buyer with the same
+     * items within the last $window seconds — i.e. this exact submission already
+     * went through (server retry, double Save, dead-worker takeover).
+     *
+     * @return int|null Existing post ID, or null when this create is genuinely new.
+     */
+    private function find_recent_duplicate($author_id, $buyer_tax_id, $items, $window = 120) {
+        global $wpdb;
+
+        $author_id    = intval($author_id);
+        $buyer_tax_id = sanitize_text_field((string) $buyer_tax_id);
+        if (!$author_id || $buyer_tax_id === '') {
+            return null;
+        }
+
+        // wp_cig_invoices.id equals the WP post ID; created_datetime is UTC.
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        $candidates = $wpdb->get_col($wpdb->prepare(
+            "SELECT id FROM {$this->table_invoices}
+             WHERE author_id = %d AND buyer_tax_id = %s
+               AND created_datetime >= (UTC_TIMESTAMP() - INTERVAL %d SECOND)
+             ORDER BY id DESC LIMIT 10",
+            $author_id, $buyer_tax_id, $window
+        ));
+        if (empty($candidates)) {
+            return null;
+        }
+
+        $sig = $this->items_signature($items);
+        foreach ($candidates as $pid) {
+            $pid = intval($pid);
+            if (get_post_status($pid) !== 'publish') {
+                continue;
+            }
+            $stored = get_post_meta($pid, '_cig_items', true);
+            if (is_array($stored) && $this->items_signature($stored) === $sig) {
+                return $pid;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Order-independent signature of an items list: product, qty and price only,
+     * so cosmetic differences (image url, description) don't defeat the match.
+     */
+    private function items_signature($items) {
+        $sig = [];
+        foreach ((array) $items as $item) {
+            $sig[] = intval($item['product_id'] ?? 0)
+                . ':' . floatval($item['qty'] ?? 0)
+                . ':' . floatval($item['price'] ?? 0);
+        }
+        sort($sig);
+        return md5(implode('|', $sig));
+    }
+
+    /**
+     * Answer a duplicate submission with the invoice that already exists.
+     * Same response shape as a normal save, so the editor redirects to it.
+     */
+    private function respond_existing_invoice($pid, $via) {
+        $pid = intval($pid);
+        wp_send_json_success([
+            'post_id'        => $pid,
+            'view_url'       => get_permalink($pid),
+            'invoice_number' => get_post_meta($pid, '_cig_invoice_number', true),
+            'status'         => get_post_meta($pid, '_cig_invoice_status', true),
+            'deduped'        => $via,
+        ]);
+    }
+
+    /**
+     * Drop idempotency option rows older than a day (volume is tiny — a handful
+     * of invoice creations per day).
+     */
+    private function cleanup_idem_options() {
+        global $wpdb;
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        $rows = $wpdb->get_results(
+            "SELECT option_name, option_value FROM {$wpdb->options}
+             WHERE option_name LIKE 'cig\\_idem\\_%' LIMIT 200",
+            ARRAY_A
+        );
+        $cutoff = time() - DAY_IN_SECONDS;
+        foreach ((array) $rows as $row) {
+            $ts = intval(explode('|', (string) $row['option_value'], 2)[0]);
+            if ($ts && $ts < $cutoff) {
+                delete_option($row['option_name']);
+            }
         }
     }
 

@@ -1,6 +1,14 @@
 jQuery(function ($) {
   'use strict';
 
+  // Idempotency token: one per form page view. Sent with every save so the
+  // server can recognise a retried submission (backend retry or a user
+  // re-clicking after an error) and return the already-created invoice
+  // instead of minting a duplicate.
+  var cigIdemToken = (window.crypto && window.crypto.randomUUID)
+    ? window.crypto.randomUUID().replace(/-/g, '')
+    : 'tk' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+
   // --- 0. PRINT BUTTON (Always Active) ---
   $(document).on('click', '#btn-print-invoice', function () { window.print(); });
 
@@ -711,7 +719,7 @@ jQuery(function ($) {
     var $btn = $(this).prop('disabled', true).text(cigAjax.i18n?.saving || 'Saving...');
     var action = editMode ? 'cig_update_invoice' : 'cig_save_invoice';
 
-    $.post(cigAjax.ajax_url, { action: action, nonce: cigAjax.nonce, payload: JSON.stringify(payload) }, function(res) {
+    $.post(cigAjax.ajax_url, { action: action, nonce: cigAjax.nonce, idem_token: cigIdemToken, payload: JSON.stringify(payload) }, function(res) {
         if (res.success) {
             // Clear DB Cart after successful save
             $.post(cigAjax.ajax_url, {
