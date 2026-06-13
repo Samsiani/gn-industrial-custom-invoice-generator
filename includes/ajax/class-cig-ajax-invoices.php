@@ -340,6 +340,11 @@ class CIG_Ajax_Invoices {
             // clients (stale cached JS) and for takeovers after a dead worker.
             $dup_id = $this->find_recent_duplicate(get_current_user_id(), $buyer['tax_id'] ?? '', $items);
             if ($dup_id) {
+                // Resolve the idem lock to this invoice — otherwise it stays
+                // 'pending' and a same-token retry is told "busy" for 60s.
+                if ($this->idem_key !== '') {
+                    update_option($this->idem_key, time() . '|' . intval($dup_id), 'no');
+                }
                 $this->respond_existing_invoice($dup_id, 'fingerprint');
             }
 
