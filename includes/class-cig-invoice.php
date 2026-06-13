@@ -174,105 +174,100 @@ class CIG_Invoice {
      * 1. If wp_cig_invoices table is empty, return the starting number from settings
      * 2. If invoices exist, return max(existing_max + 1, starting_number)
      */
-    public static function get_next_number() {
+    // ── Shared cross-plugin invoice numbering ────────────────────────────────
+    // The OLD plugin (prefix "N") and the NEW plugin gn-crm-vue (prefix "GN")
+    // share one WordPress DB. Each used to number from its own storage only, so
+    // both reached the same numeric part (e.g. N350009908 and GN350009908).
+    // These helpers make the NUMERIC part globally unique across BOTH plugins by
+    // drawing every new number from one shared sequence under a shared MySQL
+    // named lock. The NEW plugin implements the identical logic — keep the lock
+    // name + option key below in lock-step with
+    // gn-crm-vue/models/class-cig-invoice.php there.
+    const GN_SEQ_LOCK   = 'gn_invoice_number';
+    const GN_SEQ_OPTION = 'gn_shared_invoice_seq';
+
+    /** Highest numeric part already used in EITHER plugin (prefix-agnostic). */
+    private static function gn_global_max_seq() {
         global $wpdb;
-
-        // Acquire MySQL advisory lock to prevent race conditions
-        $lock_acquired = $wpdb->get_var("SELECT GET_LOCK('cig_invoice_number', 10)");
-        if ($lock_acquired != 1) {
-            // Lock not acquired (timeout) — fall through without lock, best-effort
-            error_log('CIG: Could not acquire invoice number lock in get_next_number()');
+        $vals   = [];
+        $vals[] = (int) $wpdb->get_var(
+            "SELECT MAX(CAST(REGEXP_REPLACE(meta_value, '^[^0-9]+', '') AS UNSIGNED))
+             FROM {$wpdb->postmeta} WHERE meta_key = '_cig_invoice_number'"
+        );
+        $cig_t = $wpdb->prefix . 'cig_invoices';
+        if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $cig_t)) === $cig_t) {
+            $vals[] = (int) $wpdb->get_var(
+                "SELECT MAX(CAST(REGEXP_REPLACE(invoice_number, '^[^0-9]+', '') AS UNSIGNED)) FROM {$cig_t}"
+            );
         }
+        $gncrm_t = $wpdb->prefix . 'gncrm_invoices';
+        if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $gncrm_t)) === $gncrm_t) {
+            $vals[] = (int) $wpdb->get_var(
+                "SELECT MAX(CAST(REGEXP_REPLACE(invoice_number, '^[^0-9]+', '') AS UNSIGNED)) FROM {$gncrm_t}"
+            );
+        }
+        return max($vals ?: [0]);
+    }
 
+    /** Is this numeric part already taken by ANY invoice in EITHER plugin? */
+    private static function gn_seq_taken($n) {
+        global $wpdb;
+        $n = (int) $n;
+        if ($wpdb->get_var($wpdb->prepare(
+            "SELECT 1 FROM {$wpdb->postmeta} WHERE meta_key='_cig_invoice_number' AND CAST(REGEXP_REPLACE(meta_value,'^[^0-9]+','') AS UNSIGNED) = %d LIMIT 1", $n
+        ))) return true;
+        $cig_t = $wpdb->prefix . 'cig_invoices';
+        if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $cig_t)) === $cig_t) {
+            if ($wpdb->get_var($wpdb->prepare(
+                "SELECT 1 FROM {$cig_t} WHERE CAST(REGEXP_REPLACE(invoice_number,'^[^0-9]+','') AS UNSIGNED) = %d LIMIT 1", $n
+            ))) return true;
+        }
+        $gncrm_t = $wpdb->prefix . 'gncrm_invoices';
+        if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $gncrm_t)) === $gncrm_t) {
+            if ($wpdb->get_var($wpdb->prepare(
+                "SELECT 1 FROM {$gncrm_t} WHERE CAST(REGEXP_REPLACE(invoice_number,'^[^0-9]+','') AS UNSIGNED) = %d LIMIT 1", $n
+            ))) return true;
+        }
+        return false;
+    }
+
+    /** Reserve + return the next globally-unique numeric sequence (int). */
+    private static function gn_reserve_seq($starting) {
+        global $wpdb;
+        $wpdb->get_var("SELECT GET_LOCK('" . self::GN_SEQ_LOCK . "', 10)");
         try {
-            // Get the starting invoice number from settings
-            $settings = get_option('cig_settings', []);
-            $starting_invoice = $settings['starting_invoice_number'] ?? '';
-
-            // Parse starting invoice number or use defaults
-            $starting_prefix = CIG_INVOICE_NUMBER_PREFIX;
-            $starting_seq = CIG_INVOICE_NUMBER_BASE;
-
-            if (!empty($starting_invoice)) {
-                $parsed = self::parse_invoice_number($starting_invoice);
-                if ($parsed) {
-                    $starting_prefix = $parsed['prefix'];
-                    $starting_seq = $parsed['number'];
-                }
-            }
-
-            // Check if custom table exists and has invoices
-            $table_invoices = $wpdb->prefix . 'cig_invoices';
-            $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_invoices)) === $table_invoices;
-
-            $max_seq_from_db = 0;
-            $has_invoices = false;
-
-            if ($table_exists) {
-                // Get count and max invoice number from custom table
-                // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-                $count = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table_invoices}");
-                $has_invoices = ($count > 0);
-
-                if ($has_invoices) {
-                    // Get max invoice number from custom table
-                    // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-                    $max_invoice = $wpdb->get_var("SELECT MAX(invoice_number) FROM {$table_invoices}");
-                    if ($max_invoice) {
-                        $parsed_max = self::parse_invoice_number($max_invoice);
-                        if ($parsed_max) {
-                            $max_seq_from_db = $parsed_max['number'];
-                        }
-                    }
-                }
-            }
-
-            // Also check postmeta for legacy support (in case custom table is not fully migrated)
-            $opt = get_option('cig_last_invoice_seq');
-            if ($opt !== false) {
-                $max_seq_from_db = max($max_seq_from_db, intval($opt));
-                $has_invoices = true;
-            } elseif (!$has_invoices) {
-                // Fallback: Check postmeta if no invoices in custom table
-                // Use a broader pattern that matches both formats with and without prefix
-                $rows = $wpdb->get_col($wpdb->prepare(
-                    "SELECT meta_value FROM {$wpdb->postmeta} pm INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id WHERE pm.meta_key = %s AND pm.meta_value REGEXP %s",
-                    '_cig_invoice_number', '^[A-Za-z]*[0-9]+$'
-                ));
-                if ($rows && count($rows) > 0) {
-                    $has_invoices = true;
-                    foreach ($rows as $val) {
-                        $parsed_row = self::parse_invoice_number($val);
-                        if ($parsed_row && $parsed_row['number'] > $max_seq_from_db) {
-                            $max_seq_from_db = $parsed_row['number'];
-                        }
-                    }
-                }
-            }
-
-            // Determine next sequence number
-            if (!$has_invoices) {
-                // No invoices exist - return the starting number
-                $next_seq = $starting_seq;
-            } else {
-                // Invoices exist - increment from max, but never go below starting number
-                $next_seq = max($max_seq_from_db + 1, $starting_seq);
-            }
-
-            // Update the last invoice seq option for caching
-            $current_opt = intval(get_option('cig_last_invoice_seq', 0));
-            if ($next_seq - 1 > $current_opt) {
-                update_option('cig_last_invoice_seq', $next_seq - 1, false);
-            }
-
-            // Use a consistent padding length of 8 digits (default)
-            // This ensures consistent formatting regardless of the starting number
-            $pad_length = 8;
-
-            return $starting_prefix . str_pad($next_seq, $pad_length, '0', STR_PAD_LEFT);
+            $counter = (int) get_option(self::GN_SEQ_OPTION, 0);
+            $next    = max($counter, self::gn_global_max_seq(), (int) $starting - 1) + 1;
+            $guard   = 0;
+            while ($guard++ < 100 && self::gn_seq_taken($next)) { $next++; }
+            update_option(self::GN_SEQ_OPTION, $next, false);
+            update_option('cig_last_invoice_seq', $next, false); // keep legacy cache in sync
+            return $next;
         } finally {
-            $wpdb->query("SELECT RELEASE_LOCK('cig_invoice_number')");
+            $wpdb->query("SELECT RELEASE_LOCK('" . self::GN_SEQ_LOCK . "')");
         }
+    }
+
+    private static function gn_prefix_starting() {
+        $settings = get_option('cig_settings', []);
+        $prefix   = CIG_INVOICE_NUMBER_PREFIX;
+        $starting = CIG_INVOICE_NUMBER_BASE;
+        if (!empty($settings['starting_invoice_number'])) {
+            $parsed = self::parse_invoice_number($settings['starting_invoice_number']);
+            if ($parsed) { $prefix = $parsed['prefix']; $starting = $parsed['number']; }
+        }
+        return [$prefix, $starting];
+    }
+
+    /**
+     * Preview the next number WITHOUT reserving it (form preview). Cross-plugin
+     * aware so it reflects numbers created in the new plugin too.
+     */
+    public static function get_next_number() {
+        list($prefix, $starting) = self::gn_prefix_starting();
+        $counter = (int) get_option(self::GN_SEQ_OPTION, 0);
+        $next    = max($counter, self::gn_global_max_seq(), (int) $starting - 1) + 1;
+        return $prefix . str_pad($next, 8, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -309,53 +304,23 @@ class CIG_Invoice {
      * Ensure unique invoice number
      */
     public static function ensure_unique_number($maybe, $skip_id = 0) {
-        global $wpdb;
+        $maybe = strtoupper((string) $maybe);
 
-        // Acquire MySQL advisory lock to prevent race conditions
-        $lock_acquired = $wpdb->get_var("SELECT GET_LOCK('cig_invoice_number', 10)");
-        if ($lock_acquired != 1) {
-            error_log('CIG: Could not acquire invoice number lock in ensure_unique_number()');
-        }
-
-        try {
-            // Validate format using class constant pattern (without anchors for simple validation)
-            if (empty($maybe) || !preg_match(self::INVOICE_NUMBER_PATTERN, $maybe)) {
-                $maybe = self::get_next_number();
-            }
-            $maybe = strtoupper($maybe);
-
-            // Parse the invoice number to get prefix and numeric part
-            $parsed = self::parse_invoice_number($maybe);
-            if (!$parsed) {
-                $maybe = self::get_next_number();
-                $parsed = self::parse_invoice_number($maybe);
-            }
-
-            $prefix = $parsed['prefix'];
-            // Use consistent padding of 8 digits
-            $pad_length = 8;
-
-            $tries = 0;
-            while ($tries < 15) {
-                $exists = self::number_exists($maybe);
-                if (!$exists || ($skip_id && self::is_same_number($skip_id, $maybe))) {
-                    $current_parsed = self::parse_invoice_number($maybe);
-                    if ($current_parsed) {
-                        $seq = $current_parsed['number'];
-                        $current = intval(get_option('cig_last_invoice_seq', 0));
-                        if ($seq > $current) update_option('cig_last_invoice_seq', $seq, false);
-                    }
-                    return $maybe;
-                }
-                $current_parsed = self::parse_invoice_number($maybe);
-                $seq = ($current_parsed ? $current_parsed['number'] : 0) + 1;
-                $maybe = $prefix . str_pad($seq, $pad_length, '0', STR_PAD_LEFT);
-                $tries++;
-            }
+        // Editing an existing invoice and keeping its own number: preserve it
+        // exactly (never renumber an existing invoice).
+        if ($skip_id && self::is_same_number($skip_id, $maybe)) {
             return $maybe;
-        } finally {
-            $wpdb->query("SELECT RELEASE_LOCK('cig_invoice_number')");
         }
+
+        // New invoice (or a number change): RESERVE a fresh number whose numeric
+        // part is globally unique across BOTH plugins. Keep the prefix of the
+        // requested number when valid, else the configured starting prefix.
+        list($default_prefix, $starting) = self::gn_prefix_starting();
+        $parsed = self::parse_invoice_number($maybe);
+        $prefix = ($parsed && $parsed['prefix']) ? $parsed['prefix'] : $default_prefix;
+
+        $seq = self::gn_reserve_seq($starting);
+        return $prefix . str_pad($seq, 8, '0', STR_PAD_LEFT);
     }
 
     private static function is_same_number($invoice_id, $invoice_no) {
