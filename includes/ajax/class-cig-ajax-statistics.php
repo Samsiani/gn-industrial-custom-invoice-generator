@@ -70,8 +70,12 @@ class CIG_Ajax_Statistics {
 
     /**
      * Get the appropriate date column for filtering based on invoice status.
-     * Fictive invoices use created_at (since sale_date is NULL), 
-     * while standard invoices use sale_date.
+     * Revenue is dated by the invoice's CREATION date (created_at) for both
+     * standard and fictive invoices — an invoice created on day X belongs to
+     * day X's revenue regardless of when it is later marked sold. This matches
+     * the new gn-crm-vue dashboard so both plugins show identical numbers.
+     * (Previously standard invoices used sale_date = post_modified = the
+     * sold/last-edited day, which mis-dated split-day invoices.)
      *
      * Note: Column names cannot be parameterized in SQL prepared statements,
      * so we use a whitelist approach for security. The returned value is
@@ -84,9 +88,9 @@ class CIG_Ajax_Statistics {
         // Whitelist of allowed column names for security - only these exact values can be returned
         $allowed_columns = [
             'fictive' => 'i.created_at',
-            'default' => 'i.sale_date'
+            'default' => 'i.created_at'
         ];
-        
+
         return ($status === 'fictive') ? $allowed_columns['fictive'] : $allowed_columns['default'];
     }
 
