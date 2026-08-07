@@ -3,7 +3,7 @@
  * Plugin Name: Custom WooCommerce Invoice Generator
  * Plugin URI: https://example.com/invoice-generator
  * Description: Professional invoice generator with advanced stock reservation, real-time validation, and comprehensive analytics.
- * Version: 4.9.38
+ * Version: 4.9.39
  * Author: Samsiani
  * Author URI: https://example.com
  * Text Domain: cig
@@ -39,7 +39,7 @@ add_action('before_woocommerce_init', function() {
 /**
  * Plugin constants
  */
-define('CIG_VERSION', '4.9.38');
+define('CIG_VERSION', '4.9.39');
 define('CIG_PLUGIN_FILE', __FILE__);
 define('CIG_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('CIG_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -52,7 +52,11 @@ define('CIG_ASSETS_URL', CIG_PLUGIN_URL . 'assets/');
 define('CIG_CACHE_GROUP', 'cig_cache');
 define('CIG_CACHE_EXPIRY', 900); // 15 minutes
 define('CIG_STOCK_CHECK_INTERVAL', 3600); // 1 hour
-define('CIG_MAX_RESERVATION_DAYS', 90);
+// Upper bound for a reservation window. Was 90, which silently clamped every longer
+// window back down to 90 (CIG_Validator::sanitize_reservation_days, CIG_Invoice, and the
+// settings field all clamp to this). GN's policy is now a 1000-day hold, so 90 was
+// rewriting the intended value; 3650 leaves headroom without being unbounded.
+define('CIG_MAX_RESERVATION_DAYS', 3650);
 define('CIG_DEFAULT_RESERVATION_DAYS', 30);
 define('CIG_PRODUCTS_PER_PAGE', 50);
 define('CIG_INVOICE_NUMBER_PREFIX', 'N');
@@ -268,10 +272,14 @@ final class CIG_Invoice_Generator {
      * Activation routine
      */
     public function activate() {
-        if (!wp_next_scheduled('cig_check_expired_reservations')) {
-            wp_schedule_event(time(), 'hourly', 'cig_check_expired_reservations');
+        // Reservations are never auto-cancelled any more, so this event is no longer
+        // scheduled — and any copy left over from an earlier activation is removed.
+        // See CIG_Stock_Manager::check_expired_reservations() for why.
+        while ($timestamp = wp_next_scheduled('cig_check_expired_reservations')) {
+            wp_unschedule_event($timestamp, 'cig_check_expired_reservations');
         }
-        
+
+
         // Create custom tables using DB Installer (2.0.0)
         CIG_DB_Installer::install();
         

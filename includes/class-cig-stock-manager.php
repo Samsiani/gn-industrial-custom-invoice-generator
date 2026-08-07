@@ -42,8 +42,26 @@ class CIG_Stock_Manager {
         add_action('woocommerce_product_options_stock_status', [$this, 'display_reserved_admin']);
         add_action('woocommerce_variation_options_inventory', [$this, 'display_reserved_variation'], 10, 3);
 
-        // Cron for expiring reservations
-        add_action('cig_check_expired_reservations', [$this, 'check_expired_reservations']);
+        // Expiring reservations are NO LONGER auto-cancelled (see check_expired_reservations).
+        // The hourly hook is deliberately not registered, and any event still sitting in the
+        // cron array from an older install is cleared here so it stops firing.
+        $this->unschedule_expiry_cron();
+    }
+
+    /**
+     * Remove the legacy hourly expiry cron.
+     *
+     * Reservations are held until a human ends them, so nothing should be listening on
+     * cig_check_expired_reservations. Clearing it on load makes existing installs
+     * self-heal on the next request instead of needing a reactivation.
+     */
+    private function unschedule_expiry_cron() {
+        if (!function_exists('wp_next_scheduled')) {
+            return;
+        }
+        while ($timestamp = wp_next_scheduled('cig_check_expired_reservations')) {
+            wp_unschedule_event($timestamp, 'cig_check_expired_reservations');
+        }
     }
 
     /**
@@ -351,7 +369,40 @@ class CIG_Stock_Manager {
         }
     }
 
+    /**
+     * DISABLED — reservations are never auto-cancelled any more.
+     *
+     * This used to run hourly and flip every 'reserved' line whose stored expiry had
+     * passed to 'canceled', in _cig_items postmeta AND wp_cig_invoice_items, then drop
+     * the invoice's entry from the product's _cig_reserved_stock map.
+     *
+     * It cancelled real orders silently. N250004668 (GEL 14,050, GEL 3,640 already paid)
+     * was created 2026-05-07 with a 90-day window and was auto-cancelled on 2026-08-05;
+     * the sync bridge then mirrored the cancellation into the Vue app, so the invoice
+     * showed zero revenue with the customer's payment still attached and no audit entry
+     * explaining it.
+     *
+     * Raising the reservation-days setting could not prevent this: update_reservation_meta()
+     * deliberately preserves an existing future expiry, so every live reservation kept the
+     * date stamped at creation time.
+     *
+     * Ending a reservation is now a human decision. The stored 'expires' value is kept
+     * because the dashboard's "expiring reservations" widget reads it, but nothing acts
+     * on it. The method is retained as a no-op so any stray caller or a cron event left
+     * in the database from an older install cannot cancel anything.
+     *
+     * @return void
+     */
     public function check_expired_reservations() {
+        return;
+    }
+
+    /**
+     * The original expiry sweep, kept for reference only. Never invoked.
+     *
+     * @codeCoverageIgnore
+     */
+    private function legacy_check_expired_reservations_DISABLED() {
         global $wpdb;
         $product_ids = $wpdb->get_col("SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_cig_reserved_stock'");
         if (empty($product_ids)) return;
