@@ -54,10 +54,10 @@ define('CIG_CACHE_EXPIRY', 900); // 15 minutes
 define('CIG_STOCK_CHECK_INTERVAL', 3600); // 1 hour
 // Upper bound for a reservation window. Was 90, which silently clamped every longer
 // window back down to 90 (CIG_Validator::sanitize_reservation_days, CIG_Invoice, and the
-// settings field all clamp to this). GN's policy is now a 1000-day hold, so 90 was
-// rewriting the intended value; 3650 leaves headroom without being unbounded.
-define('CIG_MAX_RESERVATION_DAYS', 3650);
-define('CIG_DEFAULT_RESERVATION_DAYS', 30);
+// settings field all clamp to this). GN's policy is a 1000-day hold, so 90 was rewriting
+// the intended value — this matches the new plugin's setting exactly.
+define('CIG_MAX_RESERVATION_DAYS', 1000);
+define('CIG_DEFAULT_RESERVATION_DAYS', 1000);
 define('CIG_PRODUCTS_PER_PAGE', 50);
 define('CIG_INVOICE_NUMBER_PREFIX', 'N');
 define('CIG_INVOICE_NUMBER_BASE', 25000000);
